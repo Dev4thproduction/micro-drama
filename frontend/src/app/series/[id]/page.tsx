@@ -9,7 +9,8 @@ import {
   Share2, 
   Lock, 
   Loader2,
-  ChevronLeft
+  ChevronLeft,
+  Crown
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -25,6 +26,8 @@ export default function SeriesDetailsPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
+        // The backend automatically checks the user's token and subscription
+        // to determine which episodes should have `isLocked: true`
         const res = await api.get(`/content/series/${id}`);
         setData(res.data.data);
       } catch (err: any) {
@@ -146,17 +149,21 @@ export default function SeriesDetailsPage() {
           <h2 className="text-2xl font-bold text-white mb-6 pl-1">{episodes.length} Episodes</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {episodes.map((ep: any, index: number) => {
-              // Logic to determine if locked (Example: Lock everything after Ep 2)
-              // You can replace this with `!ep.isFree` if your backend sends that field.
-              const isLocked = index >= 2; 
+            {episodes.map((ep: any) => {
+              // ✅ FIXED: Use the backend's `isLocked` property directly
+              const isLocked = ep.isLocked; 
 
               return (
                 <div 
                   key={ep._id}
                   onClick={() => {
-                    if (!isLocked) router.push(`/watch/${ep._id}`);
-                    // Else: Handle subscription modal trigger
+                    if (isLocked) {
+                        // ✅ Redirect to subscription if locked
+                        router.push('/subscription');
+                    } else {
+                        // ✅ Play if unlocked
+                        router.push(`/watch/${ep._id}`);
+                    }
                   }}
                   className={clsx(
                     "group bg-[#1A1A1A] rounded-lg overflow-hidden flex h-40 cursor-pointer transition-all",
@@ -170,10 +177,18 @@ export default function SeriesDetailsPage() {
                     <img 
                       src={ep.thumbnail || ep.video} 
                       alt={`Episode ${ep.order}`} 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-80 group-hover:opacity-100" 
+                      className={clsx(
+                        "w-full h-full object-cover transition-transform duration-500 group-hover:scale-110",
+                        isLocked ? "grayscale opacity-60" : "opacity-80 group-hover:opacity-100"
+                      )}
                     />
-                    {/* Dark overlay for text readability on images */}
-                    <div className="absolute inset-0 bg-black/20" />
+                    
+                    {/* Locked Overlay */}
+                    {isLocked && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                             <Lock size={24} className="text-white drop-shadow-lg" />
+                        </div>
+                    )}
                   </div>
 
                   {/* Info Section (60%) */}
@@ -189,13 +204,13 @@ export default function SeriesDetailsPage() {
                       
                       {/* Status Icon */}
                       <div className={clsx(
-                        "w-8 h-8 rounded-full flex items-center justify-center shadow-md",
+                        "w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-colors",
                         isLocked 
-                          ? "bg-white text-black" 
+                          ? "bg-gray-800 text-white/50" 
                           : "bg-white text-black"
                       )}>
                         {isLocked ? (
-                          <Lock size={14} />
+                          <Crown size={14} className="text-yellow-500" />
                         ) : (
                           <Play size={18} fill="currentColor" className="ml-0.5" />
                         )}

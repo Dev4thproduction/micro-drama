@@ -72,31 +72,28 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
         if (episodeId) initPlayer();
     }, [episodeId]);
 
-    // Handle Video End (Auto-play next)
-    const handleVideoEnded = () => {
-        if (activeIndex < episodes.length - 1) {
-            const nextEp = episodes[activeIndex + 1];
-            // ✅ Prevent auto-play if next episode is locked
-            if (!nextEp.isLocked) {
-                changeEpisode(activeIndex + 1);
-            }
+   const handleVideoEnded = () => {
+    if (activeIndex < episodes.length - 1) {
+        const nextEp = episodes[activeIndex + 1];
+        // ✅ Prevent auto-play if next episode is locked
+        if (!nextEp.isLocked) {
+            changeEpisode(activeIndex + 1);
         }
-    };
+    }
+};
 
-    // Helper to change episode
-    const changeEpisode = (index: number) => {
-        if (index >= 0 && index < episodes.length) {
-            const targetEp = episodes[index];
-            
-            // ✅ Enforce Lock on Frontend
-            if (targetEp.isLocked) {
-                router.push('/subscription');
-                return;
-            }
+   const changeEpisode = (index: number) => {
+    if (index >= 0 && index < episodes.length) {
+        const targetEp = episodes[index];
 
-            setActiveIndex(index);
+        // ✅ Enforce Lock on Frontend
+        if (targetEp.isLocked) {
+            router.push('/subscription');
+            return;
         }
-    };
+        setActiveIndex(index);
+    }
+};
 
     if (loading) {
         return (

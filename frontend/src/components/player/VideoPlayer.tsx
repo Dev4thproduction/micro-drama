@@ -13,7 +13,8 @@ import {
   ChevronUp, 
   ChevronDown,
   Settings,
-  Gauge
+  Gauge,
+  Check
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -39,11 +40,16 @@ export default function VideoPlayer({ src, poster, isActive, onEnded, onTimeUpda
     const [volume, setVolume] = useState(1);
     const [isMuted, setIsMuted] = useState(false);
     const [speed, setSpeed] = useState(1.0);
+    const [quality, setQuality] = useState('Auto'); // Default Quality
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Menu Visibility State
     const [showVolumeMenu, setShowVolumeMenu] = useState(false);
     const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+    const [showQualityMenu, setShowQualityMenu] = useState(false);
+
+    // Available Qualities
+    const qualities = ['Auto', '1080p', '720p', '480p', '360p', '240p'];
 
     // --- EFFECT: Handle Active State ---
     useEffect(() => {
@@ -63,8 +69,9 @@ export default function VideoPlayer({ src, poster, isActive, onEnded, onTimeUpda
             videoRef.current.pause();
             videoRef.current.currentTime = 0;
             setIsPlaying(false);
-            setShowVolumeMenu(false); // Close menus on inactive
+            setShowVolumeMenu(false); 
             setShowSpeedMenu(false);
+            setShowQualityMenu(false);
         }
     }, [isActive]);
 
@@ -75,8 +82,7 @@ export default function VideoPlayer({ src, poster, isActive, onEnded, onTimeUpda
         if (!videoRef.current) return;
         
         // Close menus when playing/pausing via main click
-        if (showVolumeMenu) setShowVolumeMenu(false);
-        if (showSpeedMenu) setShowSpeedMenu(false);
+        closeAllMenus();
 
         if (videoRef.current.paused) {
             videoRef.current.play();
@@ -85,6 +91,12 @@ export default function VideoPlayer({ src, poster, isActive, onEnded, onTimeUpda
             videoRef.current.pause();
             setIsPlaying(false);
         }
+    };
+
+    const closeAllMenus = () => {
+        setShowVolumeMenu(false);
+        setShowSpeedMenu(false);
+        setShowQualityMenu(false);
     };
 
     const handleTimeUpdate = () => {
@@ -132,6 +144,14 @@ export default function VideoPlayer({ src, poster, isActive, onEnded, onTimeUpda
         setSpeed(roundedSpeed);
     };
 
+    const handleQualityChange = (selectedQuality: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setQuality(selectedQuality);
+        setShowQualityMenu(false);
+        // TODO: Here you would ideally switch the video 'src' based on quality
+        console.log(`Switched to ${selectedQuality}`);
+    };
+
     const toggleFullscreen = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!containerRef.current) return;
@@ -159,7 +179,8 @@ export default function VideoPlayer({ src, poster, isActive, onEnded, onTimeUpda
         >
             <video
                 ref={videoRef}
-                className="w-full h-full object-cover"
+                // ✅ CHANGED: object-cover -> object-contain to fix stretching in fullscreen
+                className="w-full h-full object-contain"
                 src={src}
                 poster={poster}
                 muted={isMuted}
@@ -227,7 +248,7 @@ export default function VideoPlayer({ src, poster, isActive, onEnded, onTimeUpda
                                 </div>
                             )}
                             <button 
-                                onClick={(e) => { e.stopPropagation(); setShowVolumeMenu(!showVolumeMenu); setShowSpeedMenu(false); }}
+                                onClick={(e) => { e.stopPropagation(); setShowVolumeMenu(!showVolumeMenu); setShowSpeedMenu(false); setShowQualityMenu(false); }}
                                 className={clsx("p-2 rounded-full hover:bg-white/10 transition-colors", showVolumeMenu && "bg-white/10 text-primary")}
                             >
                                 {volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
@@ -254,10 +275,37 @@ export default function VideoPlayer({ src, poster, isActive, onEnded, onTimeUpda
                                 </div>
                             )}
                             <button 
-                                onClick={(e) => { e.stopPropagation(); setShowSpeedMenu(!showSpeedMenu); setShowVolumeMenu(false); }}
+                                onClick={(e) => { e.stopPropagation(); setShowSpeedMenu(!showSpeedMenu); setShowVolumeMenu(false); setShowQualityMenu(false); }}
                                 className={clsx("p-2 rounded-full hover:bg-white/10 transition-colors", showSpeedMenu && "bg-white/10 text-primary")}
                             >
                                 <Gauge size={20} />
+                            </button>
+                        </div>
+
+                         {/* --- QUALITY POPUP (New) --- */}
+                         <div className="relative">
+                            {showQualityMenu && (
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-black/80 backdrop-blur-md border border-white/10 rounded-xl p-2 flex flex-col gap-1 min-w-[100px] animate-in fade-in slide-in-from-bottom-2">
+                                    {qualities.map((q) => (
+                                        <button
+                                            key={q}
+                                            onClick={(e) => handleQualityChange(q, e)}
+                                            className={clsx(
+                                                "px-3 py-1.5 rounded-lg text-xs font-medium text-left flex items-center justify-between hover:bg-white/10 transition-colors",
+                                                quality === q ? "text-primary bg-white/5" : "text-gray-300"
+                                            )}
+                                        >
+                                            {q}
+                                            {quality === q && <Check size={12} />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); setShowVolumeMenu(false); setShowSpeedMenu(false); }}
+                                className={clsx("p-2 rounded-full hover:bg-white/10 transition-colors", showQualityMenu && "bg-white/10 text-primary")}
+                            >
+                                <Settings size={20} />
                             </button>
                         </div>
 
