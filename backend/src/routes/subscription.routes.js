@@ -1,15 +1,20 @@
 const express = require('express');
-const { requireAuth } = require('../middleware/auth'); // Ensure you have this middleware
-const subscriptionController = require('../controllers/subscriptionController');
-
 const router = express.Router();
 
-// Apply auth middleware to all routes
-router.use(requireAuth);
+// ✅ FIX 1: Destructure 'requireAuth' from the middleware object
+const { requireAuth } = require('../middleware/auth'); 
 
-// ✅ Define the routes mapping to controller functions
-router.get('/my-subscription', subscriptionController.getMySubscription);
-router.post('/subscribe', subscriptionController.subscribe);
-router.post('/cancel', subscriptionController.cancelSubscription);
+const { 
+  getMySubscription, 
+  subscribe, 
+  cancelSubscription,
+  resumeSubscription 
+} = require('../controllers/subscriptionController');
+
+// ✅ FIX 2: Use 'requireAuth' instead of 'auth' in all routes
+router.get('/my-subscription', requireAuth, getMySubscription);
+router.post('/subscribe', requireAuth, subscribe);
+router.post('/cancel', requireAuth, cancelSubscription);
+router.post('/resume', requireAuth, resumeSubscription);
 
 module.exports = router;

@@ -2,14 +2,14 @@ const Series = require('../models/Series');
 const Episode = require('../models/Episode');
 const Category = require('../models/Category');
 const WatchHistory = require('../models/WatchHistory');
-const Subscription = require('../models/Subscription'); // ✅ Added Import
+const Subscription = require('../models/Subscription');
 const { sendSuccess } = require('../utils/response');
 
 const getHome = async (req, res, next) => {
     try {
         const userId = req.user?.id;
 
-        // 1. Continue Watching (If User Logged In)
+        // 1. Continue Watching
         let continueWatching = [];
         if (userId) {
             continueWatching = await WatchHistory.find({ user: userId })
@@ -19,21 +19,21 @@ const getHome = async (req, res, next) => {
                 .populate('episode', 'title order thumbnailUrl duration');
         }
 
-        // 2. Featured Series (Random 1 for Hero Banner)
+        // 2. Featured Series
         const featured = await Series.aggregate([
-            { $match: {} }, // Show ALL statuses for debugging
+            { $match: {} }, 
             { $sample: { size: 1 } }
         ]);
 
-        // 3. Trending (Sorted by Views)
-        const trending = await Series.find({}) // Show ALL statuses
+        // 3. Trending
+        const trending = await Series.find({}) 
             .sort({ views: -1 })
             .limit(6)
             .populate('category', 'name color')
             .select('title posterUrl category rating seasonCount views');
 
-        // 4. New Episodes (Latest Published Episodes)
-        const newEpisodes = await Episode.find({}) // Show ALL statuses
+        // 4. New Episodes
+        const newEpisodes = await Episode.find({}) 
             .sort({ createdAt: -1 })
             .limit(8)
             .populate('series', 'title posterUrl')
@@ -56,17 +56,23 @@ const getHome = async (req, res, next) => {
     }
 };
 
+// ✅ UPDATE: Handle 'q' parameter for search
 const getDiscover = async (req, res, next) => {
     try {
-        const { search, category, sort } = req.query;
-        let query = {}; // Show ALL statuses
+        // Accept 'search' OR 'q' to match frontend
+        const { search, q, category, sort } = req.query;
+        const searchTerm = search || q; 
 
-        if (search) {
-            query.title = { $regex: search, $options: 'i' };
+        let query = {}; 
+
+        if (searchTerm) {
+            query.title = { $regex: searchTerm, $options: 'i' };
         }
 
-        if (category && category !== 'all') {
-            const catDoc = await Category.findOne({ slug: category });
+        if (category && category !== 'all' && category !== 'All') {
+            const catDoc = await Category.findOne({ 
+                name: { $regex: new RegExp(`^${category}$`, 'i') } 
+            });
             if (catDoc) {
                 query.category = catDoc._id;
             }
@@ -80,7 +86,7 @@ const getDiscover = async (req, res, next) => {
         const results = await Series.find(query)
             .sort(sortOption)
             .populate('category', 'name color')
-            .select('title posterUrl category views seasonCount');
+            .select('title posterUrl coverImage category views seasonCount tags'); // Added coverImage and tags
 
         return sendSuccess(res, results);
     } catch (err) {
@@ -91,15 +97,13 @@ const getDiscover = async (req, res, next) => {
 const getSeriesEpisodes = async (req, res, next) => {
     try {
         const { seriesId } = req.params;
-        const userId = req.user?.id; // ✅ Get User ID from optionalAuth
+        const userId = req.user?.id;
 
-        // Validate Series exists
         const series = await Series.findById(seriesId).select('title posterUrl description category');
         if (!series) {
             return next({ status: 404, message: 'Series not found' });
         }
 
-        // ✅ Check Subscription Status
         let isSubscribed = false;
         if (userId) {
             const subscription = await Subscription.findOne({ 
@@ -109,7 +113,6 @@ const getSeriesEpisodes = async (req, res, next) => {
             if (subscription) isSubscribed = true;
         }
 
-        // Get Episodes sorted by order
         const episodes = await Episode.find({
             series: seriesId,
             status: 'published'
@@ -117,20 +120,15 @@ const getSeriesEpisodes = async (req, res, next) => {
             .sort({ order: 1 })
             .select('title synopsis order video thumbnail duration isFree'); 
 
-        // ✅ Apply Locking Logic
-        // Rules: Free users see lock on Ep > 2. Subscribed users see everything unlocked.
         const episodesWithLock = episodes.map(ep => {
             const epObj = ep.toObject();
-            
-            // Lock if: User is NOT subscribed AND Episode Order is greater than 2
             epObj.isLocked = !isSubscribed && ep.order > 2;
-            
             return epObj;
         });
 
         return sendSuccess(res, {
             series,
-            episodes: episodesWithLock // ✅ Return modified episodes
+            episodes: episodesWithLock 
         });
     } catch (err) {
         return next(err);

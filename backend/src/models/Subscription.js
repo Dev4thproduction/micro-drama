@@ -9,6 +9,7 @@ const subscriptionSchema = new mongoose.Schema({
     enum: ['active', 'canceled', 'trial', 'expired'], 
     default: 'active' 
   },
+  autoRenew: { type: Boolean, default: true }, // Added to track cancellation at period end
   startDate: { type: Date, default: Date.now },
   renewsAt: { type: Date },
   amount: { type: Number } // Store price (99 or 199)

@@ -5,8 +5,14 @@ const { sendSuccess } = require('../utils/response');
 // Get current user's subscription
 const getMySubscription = async (req, res, next) => {
   try {
-    const subscription = await Subscription.findOne({ user: req.user.id });
-    // If no subscription, return null rather than 404, or handle on frontend
+    let subscription = await Subscription.findOne({ user: req.user.id });
+
+    // Check for expiration
+    if (subscription && subscription.status === 'active' && new Date() > new Date(subscription.renewsAt)) {
+      subscription.status = 'expired';
+      await subscription.save();
+    }
+
     return sendSuccess(res, subscription || null);
   } catch (err) {
     return next(err);
@@ -19,7 +25,6 @@ const subscribe = async (req, res, next) => {
     const { plan } = req.body; 
     const userId = req.user.id;
 
-    // ✅ UPDATE: Validate against new plan types
     if (!['weekly', 'monthly'].includes(plan)) {
       return next({ status: 400, message: 'Invalid plan. Must be weekly or monthly.' });
     }
@@ -30,6 +35,7 @@ const subscribe = async (req, res, next) => {
     if (subscription) {
         subscription.plan = plan;
         subscription.status = 'active';
+        subscription.autoRenew = true; 
         subscription.renewsAt = new Date(Date.now() + (plan === 'weekly' ? 7 : 30) * 24 * 60 * 60 * 1000);
         await subscription.save();
         return sendSuccess(res, { message: 'Plan updated', subscription });
@@ -43,6 +49,7 @@ const subscribe = async (req, res, next) => {
         user: userId,
         plan,
         status: 'active',
+        autoRenew: true,
         startDate: new Date(),
         renewsAt
     });
@@ -55,16 +62,44 @@ const subscribe = async (req, res, next) => {
   }
 };
 
-// Cancel Subscription
+// Cancel Subscription (Turn off Auto-Renew)
 const cancelSubscription = async (req, res, next) => {
   try {
     const subscription = await Subscription.findOne({ user: req.user.id });
     if (!subscription) return next({ status: 404, message: 'No active subscription found' });
 
-    subscription.status = 'canceled';
+    subscription.autoRenew = false;
     await subscription.save();
 
-    return sendSuccess(res, { message: 'Subscription canceled', subscription });
+    return sendSuccess(res, { 
+      message: 'Subscription will be canceled at the end of the period', 
+      subscription 
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// ✅ NEW: Resume Subscription (Turn on Auto-Renew)
+const resumeSubscription = async (req, res, next) => {
+  try {
+    const subscription = await Subscription.findOne({ user: req.user.id });
+    
+    if (!subscription) {
+      return next({ status: 404, message: 'No subscription found' });
+    }
+
+    if (subscription.status !== 'active') {
+      return next({ status: 400, message: 'Subscription is not active. Please subscribe again.' });
+    }
+
+    subscription.autoRenew = true;
+    await subscription.save();
+
+    return sendSuccess(res, { 
+      message: 'Subscription resumed successfully', 
+      subscription 
+    });
   } catch (err) {
     return next(err);
   }
@@ -73,5 +108,6 @@ const cancelSubscription = async (req, res, next) => {
 module.exports = {
   getMySubscription,
   subscribe,
-  cancelSubscription
+  cancelSubscription,
+  resumeSubscription 
 };

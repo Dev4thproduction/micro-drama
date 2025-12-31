@@ -8,7 +8,7 @@ import Navbar from '@/components/layout/Navbar';
 import api from '@/lib/api';
 import { 
   CreditCard, Calendar, Mail, Fingerprint, 
-  CheckCircle2, Clock, Shield, AlertCircle 
+  CheckCircle2, Clock, Shield, AlertCircle, RefreshCw 
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -34,19 +34,31 @@ export default function ManageSubscriptionPage() {
   }, []);
 
   const handleCancel = async () => {
-    if (!confirm("Are you sure you want to cancel? You will lose access immediately.")) return;
+    if (!confirm("Are you sure you want to cancel? You will lose access at the end of your current billing period.")) return;
     try {
-      await api.post('/subscriptions/cancel'); 
+      const res = await api.post('/subscriptions/cancel'); 
+      const updatedSub = res.data.data.subscription;
       
-      // 1. Show confirmation popup
-      alert("You have been downgraded to the Free tier. All premium features have been removed.");
+      const expiryDate = new Date(updatedSub.renewsAt).toLocaleDateString();
+      alert(`Subscription canceled. Your plan will expire on ${expiryDate}.`);
       
-      // 2. Immediate Downgrade (Context & Local State)
-      downgradeSubscription(); // Updates global AuthContext (removes gold border)
-      setSub({ ...sub, status: 'canceled' }); // Updates local state to show "No Active Subscription" UI
-
+      setSub(updatedSub); 
     } catch (err) {
       alert("Failed to cancel subscription");
+    }
+  };
+
+  // ✅ NEW: Handle Resume
+  const handleResume = async () => {
+    try {
+      const res = await api.post('/subscriptions/resume');
+      const updatedSub = res.data.data.subscription;
+
+      alert("Membership resumed! Auto-renew is now active.");
+      setSub(updatedSub);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to resume subscription");
     }
   };
 
@@ -96,7 +108,6 @@ export default function ManageSubscriptionPage() {
                   // ACTIVE SUBSCRIPTION STATE
                   <>
                     <div className="flex flex-col md:flex-row md:items-start gap-6">
-                      {/* Abstract Art / Cover */}
                       <div className="w-full md:w-48 aspect-video md:aspect-[4/3] rounded-2xl bg-gradient-to-br from-primary to-purple-900 shrink-0 shadow-lg flex items-center justify-center">
                         <CheckCircle2 size={48} className="text-white/50" />
                       </div>
@@ -117,7 +128,6 @@ export default function ManageSubscriptionPage() {
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-3 mt-2">
-                          {/* Only show 'Change to Monthly' if currently on Weekly */}
                           {isWeekly && (
                             <Link href="/subscription">
                               <button className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary/20">
@@ -160,7 +170,9 @@ export default function ManageSubscriptionPage() {
                 <h3 className="text-lg font-bold mb-6 text-white">Billing Details</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-12">
                   <div className="flex flex-col gap-1.5">
-                    <p className="text-gray-500 text-sm">Next Billing Date</p>
+                    <p className="text-gray-500 text-sm">
+                      {sub.autoRenew === false ? 'Expires On' : 'Next Billing Date'}
+                    </p>
                     <div className="flex items-center gap-2 text-gray-200">
                       <Calendar size={18} />
                       <span className="font-medium">{new Date(sub.renewsAt).toLocaleDateString()}</span>
@@ -189,12 +201,34 @@ export default function ManageSubscriptionPage() {
                   </div>
                 </div>
 
-                <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
-                  <p className="text-gray-500 text-sm">Looking to take a break?</p>
-                  <button onClick={handleCancel} className="text-red-400 hover:text-red-300 text-sm font-bold hover:underline transition-colors flex items-center gap-1">
-                    Cancel Subscription
-                  </button>
-                </div>
+                {/* ✅ LOGIC UPDATE: Toggle Cancel vs Resume Button */}
+                {sub.autoRenew !== false ? (
+                  <div className="mt-8 pt-6 border-t border-white/5 flex justify-between items-center">
+                    <p className="text-gray-500 text-sm">Looking to take a break?</p>
+                    <button onClick={handleCancel} className="text-red-400 hover:text-red-300 text-sm font-bold hover:underline transition-colors flex items-center gap-1">
+                      Cancel Subscription
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-8 pt-6 border-t border-white/5">
+                     <div className="bg-amber-500/10 rounded-xl p-4 border border-amber-500/20 mb-6">
+                        <p className="text-amber-400 text-sm font-bold flex items-center gap-2">
+                            <Clock size={16} />
+                            Subscription scheduled to cancel on {new Date(sub.renewsAt).toLocaleDateString()}
+                        </p>
+                     </div>
+                     
+                     <div className="flex items-center justify-between">
+                         <p className="text-gray-500 text-sm">Changed your mind?</p>
+                         <button 
+                           onClick={handleResume} 
+                           className="bg-white text-black hover:bg-gray-200 px-5 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
+                         >
+                           <RefreshCw size={16} /> Resume Membership
+                         </button>
+                     </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -207,7 +241,6 @@ export default function ManageSubscriptionPage() {
               </div>
               
               <div className="flex flex-col space-y-4">
-                {/* Mock History Items */}
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors group cursor-default">
                     <div className="flex items-center gap-3">

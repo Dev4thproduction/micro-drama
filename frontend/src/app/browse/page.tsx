@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
-import Navbar from '@/components/layout/Navbar'; // Import the new Navbar
+import Navbar from '@/components/layout/Navbar';
 import { Loader2, Zap, Play } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -24,14 +24,21 @@ function BrowseContent() {
   const genres = ['All', 'Drama', 'Urban', 'Romance', 'Fantasy', 'Comedy', 'Thriller', 'Mystery', 'Sci-Fi', 'Action'];
 
   useEffect(() => {
+    // Sync local state if URL changes (e.g. searching from Navbar again)
+    const urlQuery = searchParams.get('q') || '';
+    if (urlQuery !== query) setQuery(urlQuery);
+  }, [searchParams]);
+
+  useEffect(() => {
     const fetchResults = async () => {
       setLoading(true);
       try {
         const params: any = {};
-        if (query) params.q = query;
-        if (activeGenre !== 'All') params.genre = activeGenre;
+        if (query) params.q = query; // Sends 'q' to backend
+        if (activeGenre !== 'All') params.category = activeGenre; // Changed 'genre' to 'category' to match backend
 
-        const res = await api.get('/content/browse', { params });
+        // ✅ UPDATE: Point to '/browse' to match our updated route file
+        const res = await api.get('/browse', { params });
         setResults(res.data.data);
       } catch (err) {
         console.error(err);
@@ -54,16 +61,12 @@ function BrowseContent() {
 
   return (
     <div className="min-h-screen bg-[#0f1117] text-white font-display flex flex-col">
-      
-      {/* 1. Shared Navbar */}
       <Navbar />
 
       <main className="flex-grow relative">
-        
-        {/* 2. Explore Header (with Purple/Primary Gradient) */}
+        {/* Header */}
         <section className="relative py-16 px-4 md:px-8 overflow-hidden">
-          {/* Background Effects */}
-          <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-[#0f1117] to-[#0f1117]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-[#0f1117] to-[#0f1117]" />
           <div className="absolute top-0 right-0 w-125 h-125 bg-primary/20 blur-[120px] rounded-full pointer-events-none translate-x-1/3 -translate-y-1/3" />
 
           <div className="max-w-7xl mx-auto relative z-10 flex justify-between items-center">
@@ -75,18 +78,10 @@ function BrowseContent() {
                 {query ? `Showing results for "${query}"` : 'Dive into bite-sized stories tailored for you.'}
               </p>
             </div>
-            
-            {/* Decorative Grid */}
-            <div className="hidden md:grid grid-cols-2 gap-3 opacity-30 rotate-6">
-              <div className="w-16 h-24 rounded-lg border border-white/20 bg-white/5"></div>
-              <div className="w-16 h-24 rounded-lg border border-primary/50 bg-primary/10"></div>
-              <div className="w-16 h-24 rounded-lg border border-white/20 bg-white/5 mt-4"></div>
-              <div className="w-16 h-24 rounded-lg border border-white/20 bg-white/5 -mt-4"></div>
-            </div>
           </div>
         </section>
 
-        {/* 3. Sticky Genre Bar */}
+        {/* Sticky Genre Bar */}
         <section className="sticky top-16 z-40 bg-[#0f1117]/95 backdrop-blur-sm py-4 px-4 md:px-8 border-b border-white/5">
           <div className="max-w-7xl mx-auto overflow-x-auto pb-1 scrollbar-hide">
             <div className="flex space-x-2 min-w-max">
@@ -108,7 +103,7 @@ function BrowseContent() {
           </div>
         </section>
 
-        {/* 4. Results Grid */}
+        {/* Results Grid */}
         <section className="max-w-7xl mx-auto px-4 md:px-8 py-8 pb-32">
           {loading ? (
              <div className="flex justify-center py-40"><Loader2 className="animate-spin text-primary" size={48} /></div>
@@ -125,45 +120,32 @@ function BrowseContent() {
                   key={item._id} 
                   className="group relative block bg-[#161b22] rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 ring-1 ring-white/5 hover:ring-primary/50"
                 >
-                  {/* Poster Image */}
                   <div className="aspect-[2/3] relative overflow-hidden">
                     <img 
-                      src={item.coverImage} 
+                      src={item.coverImage || item.posterUrl} 
                       alt={item.title} 
                       className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" 
                     />
                     
-                    {/* Gradient Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0f1117] via-transparent to-transparent opacity-90" />
                     
-                    {/* Hover Play Icon */}
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 backdrop-blur-[1px]">
                          <div className="p-3 bg-white/10 rounded-full border border-white/20 backdrop-blur-md">
                             <Play fill="white" className="text-white" size={20} />
                          </div>
                     </div>
 
-                    {/* Content Info (Always visible at bottom) */}
                     <div className="absolute bottom-0 left-0 right-0 p-3">
                       <h3 className="text-white font-bold text-sm md:text-base leading-tight truncate drop-shadow-md group-hover:text-primary transition-colors">
                         {item.title}
                       </h3>
                       <div className="flex items-center gap-2 mt-1.5">
                         <span className="text-[10px] font-bold uppercase tracking-wider bg-white/10 px-1.5 py-0.5 rounded text-gray-300">
-                           {item.category || 'Series'}
+                           {item.category?.name || 'Series'}
                         </span>
                         <span className="text-[10px] text-gray-500">• {item.episodeCount || 0} Eps</span>
                       </div>
                     </div>
-
-                    {/* Trending Badge */}
-                    {item.tags?.includes('Trending') && (
-                      <div className="absolute top-2 right-2">
-                         <div className="p-1.5 bg-primary/90 rounded-full text-white shadow-lg backdrop-blur-md">
-                           <Zap size={10} fill="currentColor" />
-                         </div>
-                      </div>
-                    )}
                   </div>
                 </Link>
               ))}
@@ -172,8 +154,6 @@ function BrowseContent() {
         </section>
 
       </main>
-      
-      {/* NO FOOTER HERE as requested */}
     </div>
   );
 }

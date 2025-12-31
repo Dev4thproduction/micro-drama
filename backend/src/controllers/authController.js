@@ -17,7 +17,24 @@ const generateToken = (user) => {
 
 // Helper to get user data with subscription info
 const getUserWithSubscription = async (user) => {
+  // Find active subscription
   const sub = await Subscription.findOne({ user: user._id, status: 'active' });
+  
+  // ✅ CHECK EXPIRATION:
+  // If found but expired, update it and treat as inactive
+  if (sub && new Date() > new Date(sub.renewsAt)) {
+    sub.status = 'expired';
+    await sub.save();
+    return {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+      displayName: user.displayName,
+      subscriptionStatus: 'inactive',
+      plan: 'free'
+    };
+  }
+
   return {
     id: user._id,
     email: user.email,
