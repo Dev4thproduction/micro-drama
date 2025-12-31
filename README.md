@@ -1,7 +1,3 @@
-Here is a professional `README.md` file tailored to your **Vertical Micro-Drama** project. You can place this in the root of your repository or use it as the main documentation.
-
----
-
 # 🎬 Vertical Micro-Drama Platform
 
 A full-stack streaming platform dedicated to short-form vertical dramas. Built with the **MERN stack** and **Next.js**, this application features a TikTok-style viewing experience, a freemium subscription model, and robust content management.
