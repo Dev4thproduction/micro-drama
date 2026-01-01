@@ -233,45 +233,6 @@ export default function ManageSubscriptionPage() {
             )}
           </div>
 
-          {/* RIGHT COLUMN: HISTORY */}
-          <div className="lg:col-span-1 flex flex-col gap-6">
-            <div className="bg-[#161b22] rounded-3xl border border-white/5 p-6 h-full">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-white">Billing History</h3>
-              </div>
-              
-              <div className="flex flex-col space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors group cursor-default">
-                    <div className="flex items-center gap-3">
-                      <div className="size-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                        <CheckCircle2 size={16} />
-                      </div>
-                      <div>
-                        <p className="text-white text-sm font-bold">Payment Success</p>
-                        <p className="text-gray-500 text-xs">{new Date(Date.now() - i * 86400000 * 30).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    <p className="text-white font-bold text-sm">{planPrice}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 pt-6 border-t border-white/5">
-                <div className="bg-primary/5 rounded-xl p-4 border border-primary/20">
-                  <div className="flex gap-3">
-                    <AlertCircle size={20} className="text-primary shrink-0" />
-                    <div>
-                      <p className="text-white text-sm font-bold mb-1">Need help?</p>
-                      <p className="text-gray-500 text-xs leading-relaxed">
-                        If you have issues with billing, please contact our support team.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
 
         </div>
       </div>

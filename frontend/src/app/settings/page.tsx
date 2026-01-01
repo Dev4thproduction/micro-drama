@@ -6,11 +6,11 @@ import api from '@/lib/api';
 import Link from 'next/link';
 import { 
   User, Lock, Save, ArrowLeft, Loader2, 
-  CheckCircle, AlertCircle, Camera 
+  CheckCircle, AlertCircle, Camera, Eye, EyeOff 
 } from 'lucide-react';
 
 export default function UserSettingsPage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth(); // <--- Get updateUser from context
   
   const [formData, setFormData] = useState({
     displayName: user?.displayName || '',
@@ -18,6 +18,10 @@ export default function UserSettingsPage() {
     newPassword: '',
     confirmPassword: ''
   });
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
@@ -32,12 +36,22 @@ export default function UserSettingsPage() {
 
     setLoading(true);
     try {
-      await api.patch('/auth/profile', {
+      // 1. Call API
+      const { data } = await api.patch('/auth/profile', {
         displayName: formData.displayName,
         currentPassword: formData.currentPassword || undefined,
         newPassword: formData.newPassword || undefined
       });
+      
+      // 2. Update Local State with the response data
+      // Based on your controller, the response is directly the user data inside data.data
+      if (data.data) {
+        updateUser(data.data); 
+      }
+
       setMessage({ type: 'success', text: 'Profile updated successfully' });
+      
+      // 3. Clear sensitive fields
       setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }));
     } catch (err: any) {
       setMessage({ type: 'error', text: err.response?.data?.message || 'Update failed' });
@@ -108,37 +122,69 @@ export default function UserSettingsPage() {
                </h3>
                
                <div className="space-y-4">
+                 
+                 {/* Current Password */}
                  <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500 uppercase">Current Password</label>
-                    <input 
-                      type="password"
-                      placeholder="Required to set new password"
-                      className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-primary outline-none transition-all"
-                      value={formData.currentPassword}
-                      onChange={e => setFormData({...formData, currentPassword: e.target.value})}
-                    />
+                    <div className="relative">
+                      <input 
+                        type={showCurrentPassword ? "text" : "password"}
+                        placeholder="Required to set new password"
+                        className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-primary outline-none transition-all pr-12"
+                        value={formData.currentPassword}
+                        onChange={e => setFormData({...formData, currentPassword: e.target.value})}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                      >
+                        {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                  </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   {/* New Password */}
                    <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-500 uppercase">New Password</label>
-                      <input 
-                        type="password"
-                        placeholder="Min 8 chars"
-                        className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-primary outline-none transition-all"
-                        value={formData.newPassword}
-                        onChange={e => setFormData({...formData, newPassword: e.target.value})}
-                      />
+                      <div className="relative">
+                        <input 
+                          type={showNewPassword ? "text" : "password"}
+                          placeholder="Min 8 chars"
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-primary outline-none transition-all pr-12"
+                          value={formData.newPassword}
+                          onChange={e => setFormData({...formData, newPassword: e.target.value})}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                        >
+                          {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
                    </div>
+                   
+                   {/* Confirm New Password */}
                    <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-500 uppercase">Confirm New</label>
-                      <input 
-                        type="password"
-                        placeholder="Confirm password"
-                        className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-primary outline-none transition-all"
-                        value={formData.confirmPassword}
-                        onChange={e => setFormData({...formData, confirmPassword: e.target.value})}
-                      />
+                      <div className="relative">
+                        <input 
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder="Confirm password"
+                          className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-primary outline-none transition-all pr-12"
+                          value={formData.confirmPassword}
+                          onChange={e => setFormData({...formData, confirmPassword: e.target.value})}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                        >
+                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
                    </div>
                  </div>
                </div>

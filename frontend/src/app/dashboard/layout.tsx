@@ -1,156 +1,119 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, 
   Users, 
-  Shield, 
   CreditCard, 
-  BarChart3, 
+  Film, 
   UserPlus, 
-  LogOut, 
-  Menu, 
-  X,
-  Database,
-  Home // 1. Import Home icon
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react';
+import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { clsx } from 'clsx';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
   const pathname = usePathname();
-  const router = useRouter();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { logout, user } = useAuth();
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  const handleLogout = async () => {
-    await logout();
-    router.push('/login');
-  };
-
-  const navItems = [
+  const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'CMS & Content', href: '/dashboard/cms/categories', icon: Database },
-    { name: 'User Management', href: '/dashboard/users', icon: Users },
-    { name: 'Moderation Queue', href: '/dashboard/moderation', icon: Shield },
+    { name: 'Users', href: '/dashboard/users', icon: Users },
     { name: 'Subscriptions', href: '/dashboard/subscriptions', icon: CreditCard },
-    { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+    { name: 'Content CMS', href: '/dashboard/cms/series', icon: Film },
     { name: 'Create Admin', href: '/dashboard/create-admin', icon: UserPlus },
+    // ❌ REMOVED: Analytics
+    // ❌ REMOVED: Moderation Queue
   ];
 
   return (
     <div className="min-h-screen bg-[#0f1117] text-white font-display flex">
       
-      {/* MOBILE SIDEBAR OVERLAY */}
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-40 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
+      {/* Mobile Menu Button */}
+      <button 
+        className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-white/10 rounded-lg"
+        onClick={() => setIsMobileOpen(!isMobileOpen)}
+      >
+        {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
 
-      {/* SIDEBAR */}
+      {/* Sidebar */}
       <aside className={clsx(
-        "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#161b22] border-r border-white/5 transition-transform duration-300 lg:translate-x-0 flex flex-col",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        "fixed inset-y-0 left-0 z-40 w-64 bg-[#161b22] border-r border-white/5 transition-transform duration-300 lg:translate-x-0 lg:static",
+        isMobileOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        {/* Logo Area */}
-        <div className="h-20 flex items-center px-6 border-b border-white/5">
-           <Link href="/" className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-             <div className="size-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary border border-primary/20">
-               M
-             </div>
-             Micro-Admin
-           </Link>
-           <button className="ml-auto lg:hidden" onClick={() => setIsSidebarOpen(false)}>
-             <X size={20} className="text-gray-400" />
-           </button>
-        </div>
+        <div className="h-full flex flex-col">
+          {/* Logo */}
+          <div className="h-20 flex items-center px-8 border-b border-white/5">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+              Admin Portal
+            </h1>
+          </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1 custom-scrollbar">
-           {navItems.map((item) => {
-             const Icon = item.icon;
-             
-             const isActive = item.href === '/dashboard' 
-                ? pathname === '/dashboard'
-                : pathname.startsWith(item.href) || (item.name === 'CMS & Content' && pathname.startsWith('/dashboard/cms'));
-
-             return (
-               <Link 
-                 key={item.name} 
-                 href={item.href}
-                 onClick={() => setIsSidebarOpen(false)}
-                 className={clsx(
-                   "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group",
-                   isActive 
-                     ? "bg-primary text-white shadow-[0_0_20px_rgba(19,91,236,0.3)]" 
-                     : "text-gray-400 hover:bg-white/5 hover:text-white"
-                 )}
-               >
-                 <Icon size={20} className={clsx(isActive ? "text-white" : "text-gray-500 group-hover:text-white")} />
-                 {item.name}
-               </Link>
-             );
-           })}
-
-           {/* 2. Added Back to Home Button */}
-           <div className="pt-4 mt-4 border-t border-white/5">
-              <Link 
-                href="/"
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-all duration-200 group"
-              >
-                <Home size={20} className="text-gray-500 group-hover:text-white" />
-                Back to Home
-              </Link>
-           </div>
-        </nav>
-
-        {/* Footer User Profile */}
-        <div className="p-4 border-t border-white/5">
-            <Link href="/dashboard/settings">
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 hover:bg-white/10 transition-colors cursor-pointer group">
-                <div className="size-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-sm font-bold ring-2 ring-[#0f1117] group-hover:ring-white/20 transition-all">
-                  {user?.email?.[0].toUpperCase() || 'A'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate group-hover:text-primary transition-colors">{user?.displayName || 'Admin User'}</p>
-                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                </div>
-                <button 
-                  onClick={(e) => {
-                    e.preventDefault(); 
-                    handleLogout();
-                  }}
-                  className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors z-10"
-                  title="Sign Out"
+          {/* Navigation */}
+          <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto">
+            {navigation.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  onClick={() => setIsMobileOpen(false)}
+                  className={clsx(
+                    "flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all",
+                    isActive 
+                      ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                      : "text-gray-400 hover:bg-white/5 hover:text-white"
+                  )}
                 >
-                  <LogOut size={18} />
-                </button>
+                  <item.icon size={18} />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* User & Logout */}
+          <div className="p-4 border-t border-white/5">
+            <div className="flex items-center gap-3 px-4 py-3 mb-2">
+              <div className="size-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold">
+                {user?.email?.[0].toUpperCase()}
               </div>
-            </Link>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate text-white">{user?.displayName || 'Admin'}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+              </div>
+            </div>
+            <button 
+              onClick={logout}
+              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-400 rounded-xl hover:bg-red-500/10 transition-colors"
+            >
+              <LogOut size={18} />
+              Sign Out
+            </button>
+          </div>
         </div>
       </aside>
 
-      {/* MAIN CONTENT WRAPPER */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        
-        {/* Mobile Header */}
-        <div className="lg:hidden h-16 flex items-center px-4 border-b border-white/5 bg-[#161b22]">
-           <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-gray-400 hover:text-white">
-             <Menu size={24} />
-           </button>
-           <span className="ml-4 font-bold text-white">Dashboard</span>
+      {/* Main Content */}
+      <main className="flex-1 min-w-0 overflow-y-auto">
+        <div className="p-4 lg:p-10 max-w-7xl mx-auto animate-fade-in">
+          {children}
         </div>
+      </main>
 
-        {/* Scrollable Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar">
-           {children}
-        </main>
-      </div>
-
+      {/* Mobile Overlay */}
+      {isMobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
     </div>
   );
 }

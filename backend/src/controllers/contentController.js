@@ -8,12 +8,63 @@ const { sendSuccess } = require('../utils/response');
 // --- 1. HOME PAGE ---
 const getHomeContent = async (req, res, next) => {
   try {
-    const featured = await Series.aggregate([{ $match: { status: 'published' } }, { $sample: { size: 3 } }]);
-    const trending = await Series.find({ status: 'published' }).sort({ createdAt: -1 }).limit(10).populate('creator', 'displayName');
+    // 1. Featured: Get 3 random published series
+    const featured = await Series.aggregate([
+        { $match: { status: 'published' } }, 
+        { $sample: { size: 3 } }
+    ]);
+
+    // 2. Trending: Get top 10 newest + Calculate Episode Count using Aggregation
+    const trending = await Series.aggregate([
+        { $match: { status: 'published' } },
+        { $sort: { createdAt: -1 } },
+        { $limit: 10 },
+        // Join with 'episodes' collection to get the list of episodes
+        {
+            $lookup: {
+                from: 'episodes',       // Collection name (lowercase plural of Episode model)
+                localField: '_id',      // Field in Series
+                foreignField: 'series', // Field in Episode
+                as: 'episodeData'       // Temporary array to hold matching episodes
+            }
+        },
+        // Join with 'users' collection to get Creator details (Replaces .populate)
+        {
+            $lookup: {
+                from: 'users',
+                localField: 'creator',
+                foreignField: '_id',
+                as: 'creatorData'
+            }
+        },
+        // Shape the final result
+        {
+            $project: {
+                _id: 1,
+                title: 1,
+                description: 1,
+                coverImage: 1,
+                tags: 1,
+                status: 1,
+                createdAt: 1,
+                // ✅ Calculate the size of the episodeData array
+                episodeCount: { $size: '$episodeData' },
+                // ✅ Extract displayName from the creator array
+                creator: { 
+                    displayName: { $arrayElemAt: ['$creatorData.displayName', 0] },
+                    _id: { $arrayElemAt: ['$creatorData._id', 0] }
+                }
+            }
+        }
+    ]);
+
     const categories = await Category.find().sort({ name: 1 }).select('name');
     const genres = categories.map(c => c.name);
+
     return sendSuccess(res, { featured, trending, genres });
-  } catch (err) { return next(err); }
+  } catch (err) { 
+      return next(err); 
+  }
 };
 
 // --- 2. SEARCH ---

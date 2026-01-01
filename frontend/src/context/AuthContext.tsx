@@ -21,6 +21,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, role: string, displayName: string) => Promise<void>;
   logout: () => void;
+  updateUser: (userData: User) => void; // <--- NEW FUNCTION DEFINITION
   updateSubscription: (plan: 'weekly' | 'monthly') => void;
   downgradeSubscription: () => void;
 }
@@ -58,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { token: newToken, user: newUser } = data.data;
 
       setToken(newToken);
-      setUser(newUser); // ✅ Now includes subscriptionStatus from backend
+      setUser(newUser);
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(newUser));
 
@@ -100,6 +101,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/login');
   };
 
+  // ✅ NEW: Helper to update user data without logging in again
+  const updateUser = (userData: User) => {
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+  };
+
   const updateSubscription = (plan: 'weekly' | 'monthly') => {
     if (user) {
       const updatedUser: User = { 
@@ -127,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, updateSubscription, downgradeSubscription }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, updateUser, updateSubscription, downgradeSubscription }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,171 +1,89 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import api from '@/lib/api';
+import Link from 'next/link';
 import { 
   Users, 
-  PlayCircle, 
-  TrendingUp, 
-  DollarSign, 
-  ArrowUpRight,
-  ArrowDownRight,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Search,
-  MoreVertical,
-  Loader2
+  CreditCard, 
+  Film, 
+  Tv, 
+  Home
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import Link from 'next/link';
 
-interface DashboardData {
-  stats: {
-    totalUsers: number;
-    activeCreators: number;
-    pendingEpisodes: number;
-    revenue: number;
-  };
-  urgentItems: any[];
-}
-
-export default function DashboardOverview() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await api.get('/admin/stats');
-        setData(res.data.data);
-      } catch (err) {
-        console.error(err);
-        setError('Failed to load dashboard data');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
-
-  if (loading) return <div className="flex h-96 items-center justify-center"><Loader2 className="animate-spin text-primary" size={32} /></div>;
-  if (error) return <div className="text-red-500 text-center p-10">{error}</div>;
-
-  const { stats, urgentItems } = data!;
-
+export default function DashboardPage() {
   return (
-    <div className="space-y-8 animate-fade-in pb-10">
-      
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-8 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-10">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Dashboard Overview</h1>
-          <p className="text-gray-400 mt-1">Real-time platform insights and alerts.</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Admin Dashboard</h1>
+          <p className="text-gray-400 mt-2">Manage your platform content and users.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#161b22] border border-white/5 text-xs font-medium text-gray-400">
-             <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-             Live Updates On
-          </div>
-          <button className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold shadow-[0_0_20px_rgba(19,91,236,0.3)] transition-all hover:-translate-y-0.5">
-            Generate Report
-          </button>
-        </div>
+        <Link 
+          href="/" 
+          className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl border border-white/10 transition-colors font-medium"
+        >
+          <Home size={18} />
+          Back to Home
+        </Link>
       </div>
 
-      {/* KPI CARDS (Real Data) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { label: "Total Users", value: stats.totalUsers.toLocaleString(), trend: "Live", trendUp: true, icon: Users, color: "blue", gradient: "from-blue-500/20 to-blue-600/5" },
-          { label: "Revenue (Est)", value: `$${stats.revenue.toFixed(2)}`, trend: "+8.2%", trendUp: true, icon: DollarSign, color: "emerald", gradient: "from-emerald-500/20 to-emerald-600/5" },
-          { label: "Pending Reviews", value: stats.pendingEpisodes, trend: "Action Req", trendUp: false, icon: PlayCircle, color: "purple", gradient: "from-purple-500/20 to-purple-600/5" },
-          { label: "Active Creators", value: stats.activeCreators, trend: "+5", trendUp: true, icon: TrendingUp, color: "orange", gradient: "from-orange-500/20 to-orange-600/5" },
-        ].map((stat, i) => (
-          <div key={i} className="group relative overflow-hidden rounded-2xl bg-[#161b22] border border-white/5 p-6 hover:border-white/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
-            <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-4">
-                <div className={`p-3 rounded-xl bg-white/5 border border-white/5 text-${stat.color}-400 group-hover:bg-white/10 transition-colors`}>
-                  <stat.icon size={22} />
-                </div>
-                <div className={clsx(
-                  "flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full border backdrop-blur-md",
-                  stat.trendUp 
-                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
-                    : "bg-red-500/10 text-red-400 border-red-500/20"
-                )}>
-                  {stat.trendUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                  {stat.trend}
-                </div>
-              </div>
-              <h3 className="text-3xl font-bold text-white mb-1 tracking-tight">{stat.value}</h3>
-              <p className="text-sm text-gray-500 font-medium group-hover:text-gray-400 transition-colors">{stat.label}</p>
+      {/* Dashboard Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        {/* Users Management */}
+        <Link href="/dashboard/users" className="block group">
+          <div className="h-full p-6 bg-[#161b22] border border-white/5 rounded-2xl hover:border-primary/50 transition-all group-hover:-translate-y-1 group-hover:shadow-lg group-hover:shadow-primary/10">
+            <div className="size-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center mb-4 ring-1 ring-blue-500/20">
+              <Users size={24} />
             </div>
+            <h3 className="text-xl font-bold text-white mb-2">User Management</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              View registered users, manage roles, and handle account statuses.
+            </p>
           </div>
-        ))}
-      </div>
+        </Link>
 
-      {/* URGENT ATTENTION (Real Pending Items) */}
-      <div className="rounded-2xl bg-[#161b22] border border-white/5 overflow-hidden">
-        <div className="p-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-500/10 rounded-lg text-red-500">
-               <AlertTriangle size={20} />
+        {/* Subscriptions */}
+        <Link href="/dashboard/subscriptions" className="block group">
+          <div className="h-full p-6 bg-[#161b22] border border-white/5 rounded-2xl hover:border-emerald-500/50 transition-all group-hover:-translate-y-1 group-hover:shadow-lg group-hover:shadow-emerald-500/10">
+            <div className="size-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4 ring-1 ring-emerald-500/20">
+              <CreditCard size={24} />
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Urgent Attention</h3>
-              <p className="text-sm text-gray-500">Recent items requiring moderation.</p>
-            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Subscriptions</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Monitor active subscriptions, revenue plans, and billing cycles.
+            </p>
           </div>
-          <Link href="/dashboard/moderation" className="text-primary text-sm font-bold hover:underline">
-            Go to Moderation Queue &rarr;
-          </Link>
-        </div>
+        </Link>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-black/20 text-xs uppercase tracking-wider text-gray-500 font-medium">
-                <th className="px-6 py-4">Item Details</th>
-                <th className="px-6 py-4">Series</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 text-sm">
-              {urgentItems.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">No urgent items found. Great job!</td></tr>
-              ) : urgentItems.map((item: any) => (
-                <tr key={item._id} className="group hover:bg-white/5 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-white group-hover:text-primary transition-colors">{item.title}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">Video Upload</div>
-                  </td>
-                  <td className="px-6 py-4 text-gray-300">
-                    {item.series?.title || 'Unknown Series'}
-                  </td>
-                  <td className="px-6 py-4 text-gray-500 font-mono text-xs">
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
-                      <div className="size-1.5 rounded-full bg-yellow-500" /> Pending
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Link href="/dashboard/moderation">
-                      <button className="px-3 py-1.5 rounded hover:bg-white/10 text-primary border border-white/10 transition-colors text-xs font-bold">
-                        Review
-                      </button>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {/* Series Content CMS */}
+        <Link href="/dashboard/cms/series" className="block group">
+          <div className="h-full p-6 bg-[#161b22] border border-white/5 rounded-2xl hover:border-purple-500/50 transition-all group-hover:-translate-y-1 group-hover:shadow-lg group-hover:shadow-purple-500/10">
+            <div className="size-12 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center mb-4 ring-1 ring-purple-500/20">
+              <Tv size={24} />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Series Management</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Upload new drama series, manage episodes, and update metadata.
+            </p>
+          </div>
+        </Link>
+        
+        {/* Movies Content CMS */}
+        <Link href="/dashboard/cms/movies" className="block group">
+          <div className="h-full p-6 bg-[#161b22] border border-white/5 rounded-2xl hover:border-pink-500/50 transition-all group-hover:-translate-y-1 group-hover:shadow-lg group-hover:shadow-pink-500/10">
+            <div className="size-12 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center mb-4 ring-1 ring-pink-500/20">
+              <Film size={24} />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Movies Management</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Upload standalone movies and manage vertical short films.
+            </p>
+          </div>
+        </Link>
+
+        {/* Removed: Moderation Queue & Analytics */}
+
       </div>
     </div>
   );

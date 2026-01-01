@@ -175,8 +175,6 @@ export default function HomePage() {
                     <h3 className="font-bold text-white group-hover:text-primary transition-colors truncate text-lg">{item.title}</h3>
                     <div className="flex items-center gap-3 text-xs text-gray-500 mt-1.5 font-medium">
                       <span className="flex items-center gap-1"><Clock size={12} /> {item.episodeCount || 0} Eps</span>
-                      <span className="size-1 rounded-full bg-gray-700" />
-                      <span>{item.creator?.displayName || 'Unknown'}</span>
                     </div>
                   </div>
                 </Link>
