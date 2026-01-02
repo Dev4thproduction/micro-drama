@@ -18,4 +18,7 @@ router.get('/episodes/:episodeId', optionalAuth, contentController.getEpisodeDet
 router.get('/series', requireAuth, contentController.searchContent); 
 router.get('/series/:seriesId/episodes', requireAuth, contentController.listPublishedEpisodes);
 
+router.put('/episodes/:id', requireAuth, contentController.updateEpisode);
+router.delete('/episodes/:id', requireAuth, contentController.deleteEpisode);
+
 module.exports = router;

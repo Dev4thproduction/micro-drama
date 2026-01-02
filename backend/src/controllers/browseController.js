@@ -21,19 +21,20 @@ const getHome = async (req, res, next) => {
 
         // 2. Featured Series
         const featured = await Series.aggregate([
-            { $match: {} }, 
+            { $match: { status: 'published' } }, 
             { $sample: { size: 1 } }
         ]);
 
         // 3. Trending
-        const trending = await Series.find({}) 
+        const trending = await Series.find({ status: 'published' }) 
             .sort({ views: -1 })
             .limit(6)
-            .populate('category', 'name color')
+            // Note: Since category is a String in Series, populate won't work unless changed to ObjectId.
+            // For Home, we return it as is.
             .select('title posterUrl category rating seasonCount views');
 
         // 4. New Episodes
-        const newEpisodes = await Episode.find({}) 
+        const newEpisodes = await Episode.find({ status: 'published' }) 
             .sort({ createdAt: -1 })
             .limit(8)
             .populate('series', 'title posterUrl')
@@ -56,37 +57,66 @@ const getHome = async (req, res, next) => {
     }
 };
 
-// ✅ UPDATE: Handle 'q' parameter for search
+// ✅ REWRITTEN: Handles Search, Category Filter, and Episode Counts correctly
 const getDiscover = async (req, res, next) => {
     try {
-        // Accept 'search' OR 'q' to match frontend
         const { search, q, category, sort } = req.query;
-        const searchTerm = search || q; 
+        const searchTerm = search || q;
 
-        let query = {}; 
+        // 1. Build Match Stage
+        // Ensure we only show published series
+        let matchStage = { status: 'published' }; 
 
         if (searchTerm) {
-            query.title = { $regex: searchTerm, $options: 'i' };
+            matchStage.title = { $regex: searchTerm, $options: 'i' };
         }
 
         if (category && category !== 'all' && category !== 'All') {
-            const catDoc = await Category.findOne({ 
-                name: { $regex: new RegExp(`^${category}$`, 'i') } 
-            });
-            if (catDoc) {
-                query.category = catDoc._id;
-            }
+            // Fix: Series.category is a String, so we match it directly (case-insensitive)
+            matchStage.category = { $regex: new RegExp(`^${category}$`, 'i') };
         }
 
-        let sortOption = { createdAt: -1 }; // Default new
+        // 2. Sort Stage
+        let sortStage = { createdAt: -1 }; // Default newest
         if (sort === 'popular') {
-            sortOption = { views: -1 };
+            sortStage = { views: -1 };
         }
 
-        const results = await Series.find(query)
-            .sort(sortOption)
-            .populate('category', 'name color')
-            .select('title posterUrl coverImage category views seasonCount tags'); // Added coverImage and tags
+        // 3. Aggregation Pipeline
+        const results = await Series.aggregate([
+            { $match: matchStage },
+            // Lookup Episodes to calculate count
+            {
+                $lookup: {
+                    from: 'episodes',
+                    localField: '_id',
+                    foreignField: 'series',
+                    as: 'episodeData'
+                }
+            },
+            {
+                $addFields: {
+                    // Calculate count
+                    episodeCount: { $size: '$episodeData' },
+                    // Fix: Map string category to object structure for frontend { category: { name: "Drama" } }
+                    category: { name: '$category' }
+                }
+            },
+            { $sort: sortStage },
+            {
+                $project: {
+                    title: 1,
+                    posterUrl: 1,
+                    coverImage: 1,
+                    category: 1, 
+                    views: 1,
+                    seasonCount: 1,
+                    tags: 1,
+                    episodeCount: 1,
+                    createdAt: 1
+                }
+            }
+        ]);
 
         return sendSuccess(res, results);
     } catch (err) {

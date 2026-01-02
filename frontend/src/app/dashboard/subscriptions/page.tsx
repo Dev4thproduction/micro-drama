@@ -21,11 +21,12 @@ export default function SubscriptionsPage() {
           api.get('/admin/stats'),
           api.get('/admin/subscriptions', { params: { page, search } })
         ]);
-        setStats(statsRes.data.data.stats);
+        
+        setStats(statsRes.data.data.stats || {});
         setSubs(subsRes.data.data || []);
         setTotalPages(subsRes.data.meta?.totalPages || 1);
       } catch (err) {
-        console.error(err);
+        console.error("Failed to fetch subscription data:", err);
       } finally {
         setLoading(false);
       }
@@ -46,23 +47,27 @@ export default function SubscriptionsPage() {
 
       {/* STATS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* REVENUE CARD - RUPEES */}
         <div className="bg-[#161b22] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-16 bg-emerald-500/10 rounded-full blur-[40px] group-hover:bg-emerald-500/20 transition-colors"></div>
           <div className="relative z-10">
              <div className="flex justify-between mb-4">
-               <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500"><DollarSign size={22} /></div>
-               <span className="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-2 py-1 rounded-full border border-emerald-500/20">Live</span>
+               {/* Using Indian Rupee Icon can be done with text '₹' or a custom icon, here we use text for clarity */}
+               <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500 font-bold text-lg">₹</div>
+               <span className="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-2 py-1 rounded-full border border-emerald-500/20">Monthly Run Rate</span>
              </div>
-             <h3 className="text-3xl font-bold text-white">${(stats.revenue || 0).toFixed(2)}</h3>
-             <p className="text-sm text-gray-500">Total Revenue</p>
+             <h3 className="text-3xl font-bold text-white">₹{(stats.revenue || 0).toLocaleString('en-IN')}</h3>
+             <p className="text-sm text-gray-500">Estimated Monthly Revenue</p>
           </div>
         </div>
+
+        {/* ACTIVE SUBSCRIBERS */}
         <div className="bg-[#161b22] border border-white/5 rounded-2xl p-6">
              <div className="flex justify-between mb-4">
                <div className="p-3 rounded-xl bg-purple-500/10 text-purple-500"><TrendingUp size={22} /></div>
              </div>
-             <h3 className="text-3xl font-bold text-white">{subs.filter(s => s.status === 'active').length}</h3>
-             <p className="text-sm text-gray-500">Active Subscribers (This Page)</p>
+             <h3 className="text-3xl font-bold text-white">{stats.activeSubscribers || 0}</h3>
+             <p className="text-sm text-gray-500">Total Active Subscribers</p>
         </div>
       </div>
 
@@ -90,12 +95,18 @@ export default function SubscriptionsPage() {
                      <tr key={sub._id} className="group hover:bg-white/[0.02]">
                         <td className="px-6 py-4">
                            <div className="flex items-center gap-3">
-                              <div className="size-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold text-white">{sub.user?.email?.[0].toUpperCase() || '?'}</div>
+                              <div className="size-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold text-white">{sub.user?.email?.[0]?.toUpperCase() || '?'}</div>
                               <div><div className="font-bold text-white">{sub.user?.displayName || 'Unknown'}</div><div className="text-xs text-gray-500">{sub.user?.email}</div></div>
                            </div>
                         </td>
                         <td className="px-6 py-4">
-                           {sub.plan === 'premium' ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20"><Crown size={12} fill="currentColor" /> Premium</span> : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20"><Zap size={12} /> Basic</span>}
+                           {sub.plan === 'monthly' ? (
+                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20"><Crown size={12} fill="currentColor" /> Monthly (₹199)</span>
+                           ) : sub.plan === 'weekly' ? (
+                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20"><Zap size={12} /> Weekly (₹99)</span>
+                           ) : (
+                               <span className="text-gray-400">{sub.plan}</span>
+                           )}
                         </td>
                         <td className="px-6 py-4"><span className={clsx("text-xs font-bold px-2 py-1 rounded-full border", sub.status === 'active' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-red-500/10 text-red-500 border-red-500/20")}>{sub.status.toUpperCase()}</span></td>
                         <td className="px-6 py-4 text-gray-500 font-mono text-xs">{new Date(sub.startDate).toLocaleDateString()}</td>

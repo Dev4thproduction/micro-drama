@@ -4,37 +4,44 @@ const Series = require('../models/Series');
 const Episode = require('../models/Episode');
 const User = require('../models/User');
 const Subscription = require('../models/Subscription');
-const WatchHistory = require('../models/WatchHistory'); 
 const { sendSuccess } = require('../utils/response');
 const { parsePagination, buildMeta } = require('../utils/pagination');
 
 // --- 1. DASHBOARD OVERVIEW ---
 const getDashboardStats = async (req, res, next) => {
   try {
-    const [totalUsers, activeCreators, pendingEpisodes, subscriptions] = await Promise.all([
-      User.countDocuments({ role: 'viewer' }),
-      User.countDocuments({ role: 'creator', status: 'active' }),
+    // 1. Fetch Key Counts (No Creator Stats)
+    const [totalUsers, pendingEpisodes, subscriptions] = await Promise.all([
+      User.countDocuments({ role: 'viewer' }), 
       Episode.countDocuments({ status: 'pending' }),
       Subscription.find({ status: 'active' })
     ]);
 
-    // Updated Revenue Calculation for Weekly (99) & Monthly (199)
+    // 2. Calculate Revenue (In Rupees)
+    // Assumptions: Weekly = ₹99, Monthly = ₹199
+    // We calculate "Monthly Recurring Revenue" (MRR)
     let revenue = 0;
     subscriptions.forEach(sub => {
         if (sub.plan === 'weekly') {
-            revenue += (99 * 4); // Approx monthly revenue from weekly users
+            revenue += (99 * 4); // ₹99/week * 4 weeks = ₹396/month contribution
         } else {
-            revenue += 199; // Monthly users
+            revenue += 199;      // ₹199/month
         }
     });
 
+    // 3. Urgent Items (Pending Episodes)
     const urgentItems = await Episode.find({ status: 'pending' })
       .populate('series', 'title') 
       .sort({ createdAt: -1 })
       .limit(5);
 
     return sendSuccess(res, {
-      stats: { totalUsers, activeCreators, pendingEpisodes, revenue },
+      stats: { 
+        totalUsers, 
+        pendingEpisodes, 
+        revenue,             // Returns value in Rupees (e.g., 5000)
+        activeSubscribers: subscriptions.length 
+      },
       urgentItems
     });
   } catch (err) {
@@ -59,7 +66,15 @@ const getUsers = async (req, res, next) => {
         { displayName: { $regex: search, $options: 'i' } }
       ];
     }
-    if (role && role !== 'all') filter.role = role;
+    
+    // Filter by Role (Only Admin or Viewer)
+    if (role && role !== 'all') {
+        filter.role = role;
+    } else {
+        // By default, do not show 'creator' if they exist in DB, unless explicitly asked
+        filter.role = { $in: ['admin', 'viewer'] }; 
+    }
+
     if (status && status !== 'all') filter.status = status;
 
     const [users, total] = await Promise.all([
@@ -144,8 +159,6 @@ const approveEpisode = async (req, res, next) => {
 const rejectEpisode = async (req, res, next) => {
   try {
     const { episodeId } = req.params;
-    // const { reason } = req.body; // Logic available if model supports reason
-
     const episode = await Episode.findById(episodeId);
     if (!episode) return next({ status: 404, message: 'Episode not found' });
 
@@ -169,7 +182,7 @@ const toggleSubscription = async (req, res, next) => {
 
     let subscription = await Subscription.findOne({ user: userId });
     
-    // Updated default to 'monthly' to match enum ['weekly', 'monthly']
+    // Default to 'monthly' (₹199) if creating new
     if (!subscription) {
       subscription = new Subscription({ user: userId, plan: 'monthly', status: 'trial' });
     }
@@ -217,40 +230,9 @@ const getSubscribers = async (req, res, next) => {
   }
 };
 
-// --- NEW: SUBSCRIPTION ANALYTICS ---
-const getSubscriptionStats = async (req, res, next) => {
-  try {
-    // 1. Count Active Subscribers by Plan
-    const stats = await Subscription.aggregate([
-      { $match: { status: 'active' } },
-      { $group: { _id: '$plan', count: { $sum: 1 } } }
-    ]);
-
-    // 2. Count Canceled/Expired
-    const inactiveCount = await Subscription.countDocuments({ status: { $in: ['canceled', 'expired'] } });
-    
-    // 3. Calculate Estimated Monthly Revenue (MRR)
-    const weeklyCount = stats.find(s => s._id === 'weekly')?.count || 0;
-    const monthlyCount = stats.find(s => s._id === 'monthly')?.count || 0;
-    
-    // Revenue: (Weekly users * 99 * 4 weeks) + (Monthly users * 199)
-    const estimatedRevenue = (weeklyCount * 99 * 4) + (monthlyCount * 199);
-
-    return sendSuccess(res, {
-      weekly: weeklyCount,
-      monthly: monthlyCount,
-      inactive: inactiveCount,
-      revenue: estimatedRevenue
-    });
-  } catch (err) {
-    return next(err);
-  }
-};
-
 // --- 5. ANALYTICS ---
 const getAnalytics = async (req, res, next) => {
   try {
-    // Mock data connected to future WatchHistory aggregation
     const genreStats = [
        { _id: 'Sci-Fi', count: 450 },
        { _id: 'Romance', count: 320 },
@@ -299,7 +281,6 @@ module.exports = {
   rejectEpisode,
   toggleSubscription,
   getSubscribers,
-  getSubscriptionStats, // Exported new function
   getAnalytics,
   createAdmin
 };

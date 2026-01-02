@@ -4,7 +4,7 @@ const { sendSuccess } = require('../utils/response');
 const getUploadSignature = async (req, res, next) => {
   try {
     const timestamp = Math.round((new Date()).getTime() / 1000);
-    const folder = 'micro_drama_content';
+    const folder = 'micro_drama_content'; // Or dynamic based on req.query
 
     const signature = cloudinary.utils.api_sign_request({
       timestamp: timestamp,

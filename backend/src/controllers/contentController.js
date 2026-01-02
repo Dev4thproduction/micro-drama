@@ -1,9 +1,25 @@
 const { Types } = require('mongoose');
 const Series = require('../models/Series');
 const Episode = require('../models/Episode');
+const Season = require('../models/Season'); // ✅ Ensure Season model is imported
 const Category = require('../models/Category'); 
 const Subscription = require('../models/Subscription'); 
 const { sendSuccess } = require('../utils/response');
+
+// --- HELPER: Map DB fields to Frontend fields ---
+const formatEpisode = (episode) => {
+    if (!episode) return null;
+    const ep = episode.toObject ? episode.toObject() : episode;
+    return {
+        ...ep,
+        // Frontend expects 'videoUrl' and 'thumbnailUrl', DB has 'video' and 'thumbnail'
+        videoUrl: ep.video || ep.videoUrl, 
+        thumbnailUrl: ep.thumbnail || ep.thumbnailUrl,
+        // Ensure legacy support if needed
+        video: ep.video,
+        thumbnail: ep.thumbnail
+    };
+};
 
 // --- 1. HOME PAGE ---
 const getHomeContent = async (req, res, next) => {
@@ -19,16 +35,14 @@ const getHomeContent = async (req, res, next) => {
         { $match: { status: 'published' } },
         { $sort: { createdAt: -1 } },
         { $limit: 10 },
-        // Join with 'episodes' collection to get the list of episodes
         {
             $lookup: {
-                from: 'episodes',       // Collection name (lowercase plural of Episode model)
-                localField: '_id',      // Field in Series
-                foreignField: 'series', // Field in Episode
-                as: 'episodeData'       // Temporary array to hold matching episodes
+                from: 'episodes',
+                localField: '_id',
+                foreignField: 'series',
+                as: 'episodeData'
             }
         },
-        // Join with 'users' collection to get Creator details (Replaces .populate)
         {
             $lookup: {
                 from: 'users',
@@ -37,7 +51,6 @@ const getHomeContent = async (req, res, next) => {
                 as: 'creatorData'
             }
         },
-        // Shape the final result
         {
             $project: {
                 _id: 1,
@@ -47,9 +60,7 @@ const getHomeContent = async (req, res, next) => {
                 tags: 1,
                 status: 1,
                 createdAt: 1,
-                // ✅ Calculate the size of the episodeData array
                 episodeCount: { $size: '$episodeData' },
-                // ✅ Extract displayName from the creator array
                 creator: { 
                     displayName: { $arrayElemAt: ['$creatorData.displayName', 0] },
                     _id: { $arrayElemAt: ['$creatorData._id', 0] }
@@ -84,17 +95,15 @@ const searchContent = async (req, res, next) => {
 const getSeriesDetails = async (req, res, next) => {
   try {
     const { seriesId } = req.params;
-    const userId = req.user?.id; // ✅ User ID from optionalAuth
+    const userId = req.user?.id;
 
     if (!Types.ObjectId.isValid(seriesId)) return next({ status: 400, message: 'Invalid ID' });
 
     const series = await Series.findOne({ _id: seriesId, status: 'published' }).populate('creator', 'displayName');
     if (!series) return next({ status: 404, message: 'Series not found' });
 
-    // ✅ CHECK SUBSCRIPTION
     let isSubscribed = false;
     if (userId) {
-        // Check for ANY active subscription (weekly OR monthly)
         const subscription = await Subscription.findOne({ 
             user: userId, 
             status: { $in: ['active', 'trial'] } 
@@ -104,12 +113,11 @@ const getSeriesDetails = async (req, res, next) => {
 
     const episodes = await Episode.find({ series: seriesId, status: 'published' }).sort({ order: 1 });
 
-    // ✅ APPLY LOCK LOGIC
+    // ✅ Map DB fields to Frontend fields AND apply locks
     const episodesWithLock = episodes.map(ep => {
-        const epObj = ep.toObject();
-        // Lock if NOT subscribed AND Order > 2
-        epObj.isLocked = !isSubscribed && ep.order > 2;
-        return epObj;
+        const formatted = formatEpisode(ep);
+        formatted.isLocked = !isSubscribed && formatted.order > 2;
+        return formatted;
     });
 
     return sendSuccess(res, { series, episodes: episodesWithLock });
@@ -125,7 +133,6 @@ const getEpisodeDetails = async (req, res, next) => {
     const episode = await Episode.findOne({ _id: episodeId, status: 'published' }).populate('series');
     if (!episode) return next({ status: 404, message: 'Episode not found' });
 
-    // ✅ SECURITY CHECK
     if (episode.order > 2) {
         if (!userId) return next({ status: 403, message: 'Sign in required' });
         
@@ -137,14 +144,152 @@ const getEpisodeDetails = async (req, res, next) => {
         if (!sub) return next({ status: 403, message: 'Premium subscription required' });
     }
 
-    return sendSuccess(res, episode);
+    // ✅ Return formatted episode
+    return sendSuccess(res, formatEpisode(episode));
   } catch (err) { return next(err); }
+};
+
+// --- 5. ADMIN: GET ALL SERIES ---
+const getAllSeries = async (req, res, next) => {
+  try {
+    const series = await Series.find().sort({ createdAt: -1 });
+    return sendSuccess(res, series);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// --- 6. ADMIN: GET SEASONS ---
+const getSeasons = async (req, res, next) => {
+  try {
+    const { seriesId } = req.params;
+    const seasons = await Season.find({ series: seriesId }).sort({ number: 1 });
+    return sendSuccess(res, seasons);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// --- 7. ADMIN: CREATE SEASON ---
+const createSeason = async (req, res, next) => {
+  try {
+    const { seriesId } = req.params;
+    const { title, number } = req.body;
+    
+    let seasonNumber = number;
+    if (!seasonNumber) {
+        const lastSeason = await Season.findOne({ series: seriesId }).sort({ number: -1 });
+        seasonNumber = (lastSeason?.number || 0) + 1;
+    }
+
+    const season = await Season.create({
+        series: seriesId,
+        title: title || `Season ${seasonNumber}`,
+        number: seasonNumber,
+        status: 'draft'
+    });
+    
+    return sendSuccess(res, season);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// --- 8. ADMIN: GET EPISODES (ALL STATUSES) ---
+const getAdminEpisodes = async (req, res, next) => {
+  try {
+    const { seriesId } = req.params;
+    const episodes = await Episode.find({ series: seriesId }).sort({ order: 1 });
+    // ✅ Map for frontend
+    const formattedEpisodes = episodes.map(formatEpisode);
+    return sendSuccess(res, formattedEpisodes);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// --- 9. ADMIN: CREATE EPISODE ---
+const createEpisode = async (req, res, next) => {
+  try {
+    const { seriesId } = req.params;
+    // ✅ Map Frontend 'videoUrl' -> DB 'video', 'thumbnailUrl' -> 'thumbnail'
+    const { videoUrl, thumbnailUrl, ...rest } = req.body;
+    
+    const episodeData = { 
+        ...rest, 
+        series: seriesId,
+        video: videoUrl || rest.video,
+        thumbnail: thumbnailUrl || rest.thumbnail
+    };
+    
+    const episode = await Episode.create(episodeData);
+    return sendSuccess(res, formatEpisode(episode));
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// --- 10. UPDATE EPISODE ---
+const updateEpisode = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    // ✅ Map Frontend 'videoUrl' -> DB 'video', 'thumbnailUrl' -> 'thumbnail'
+    const { videoUrl, thumbnailUrl, ...rest } = req.body;
+
+    const updateData = { ...rest };
+    if (videoUrl) updateData.video = videoUrl;
+    if (thumbnailUrl) updateData.thumbnail = thumbnailUrl;
+
+    const updatedEpisode = await Episode.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedEpisode) {
+      return next({ status: 404, message: "Episode not found" });
+    }
+
+    return sendSuccess(res, formatEpisode(updatedEpisode));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// --- 11. DELETE EPISODE ---
+const deleteEpisode = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const episode = await Episode.findById(id);
+    if (!episode) {
+      return next({ status: 404, message: "Episode not found" });
+    }
+
+    await Episode.findByIdAndDelete(id);
+
+    return sendSuccess(res, { message: "Episode deleted successfully" });
+  } catch (error) {
+    return next(error);
+  }
 };
 
 const listPublishedEpisodes = (req, res, next) => getSeriesDetails(req, res, next);
 const listPublishedSeries = (req, res, next) => searchContent(req, res, next);
 
 module.exports = {
-  getHomeContent, searchContent, getSeriesDetails, 
-  listPublishedEpisodes, getEpisodeDetails, listPublishedSeries
+  getHomeContent, 
+  searchContent, 
+  getSeriesDetails, 
+  listPublishedEpisodes, 
+  getEpisodeDetails, 
+  listPublishedSeries,
+  // Admin Functions
+  getAllSeries,
+  getSeasons,
+  createSeason,
+  getAdminEpisodes,
+  createEpisode,
+  updateEpisode,
+  deleteEpisode
 };

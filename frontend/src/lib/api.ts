@@ -37,4 +37,18 @@ api.interceptors.response.use(
   }
 );
 
+// ... existing imports
+
+export const updateEpisode = async (id: string, data: any) => {
+  const response = await api.put(`/content/episodes/${id}`, data);
+  return response.data;
+};
+
+export const deleteEpisode = async (id: string) => {
+  const response = await api.delete(`/content/episodes/${id}`);
+  return response.data;
+};
+
+// ... existing exports
+
 export default api;

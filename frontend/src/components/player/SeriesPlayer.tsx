@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import VideoPlayer from '@/components/player/VideoPlayer';
 import { 
   Loader2, ChevronLeft, ChevronRight, Play, Clock, Eye, Plus, 
-  Share2, ThumbsUp, MoreHorizontal, Sparkles, Lock, Crown
+  Share2, ThumbsUp, MoreHorizontal, Sparkles, Lock, Crown, X
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useRouter } from 'next/navigation';
@@ -19,7 +19,7 @@ interface Episode {
     video: string;      
     thumbnail: string;  
     duration?: number; 
-    isLocked?: boolean; // ✅ Added lock flag
+    isLocked?: boolean; 
 }
 
 interface SeriesPlayerProps {
@@ -32,6 +32,9 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
     const [seriesInfo, setSeriesInfo] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     
+    // ✅ NEW: State for the Lock Modal
+    const [showLockModal, setShowLockModal] = useState(false);
+
     // Player State
     const [activeIndex, setActiveIndex] = useState(0);
     const activeEpisode = episodes[activeIndex];
@@ -74,26 +77,23 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
 
    const handleVideoEnded = () => {
     if (activeIndex < episodes.length - 1) {
-        const nextEp = episodes[activeIndex + 1];
-        // ✅ Prevent auto-play if next episode is locked
-        if (!nextEp.isLocked) {
-            changeEpisode(activeIndex + 1);
-        }
+        // Try to play next episode. changeEpisode handles the lock check.
+        changeEpisode(activeIndex + 1);
     }
-};
+   };
 
    const changeEpisode = (index: number) => {
     if (index >= 0 && index < episodes.length) {
         const targetEp = episodes[index];
 
-        // ✅ Enforce Lock on Frontend
+        // ✅ UPDATE: Show Modal instead of Redirecting
         if (targetEp.isLocked) {
-            router.push('/subscription');
+            setShowLockModal(true);
             return;
         }
         setActiveIndex(index);
     }
-};
+   };
 
     if (loading) {
         return (
@@ -156,47 +156,23 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                         <div className="absolute -inset-1 bg-gradient-to-tr from-primary/30 to-blue-600/30 rounded-2xl blur opacity-50 group-hover/player:opacity-80 transition duration-1000" />
                         
                         <div className="relative w-full h-full rounded-xl overflow-hidden bg-black ring-1 ring-white/10 shadow-inner">
-                            {activeEpisode && (
-                                activeEpisode.isLocked ? (
-                                    // ✅ Locked State Overlay
-                                    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm text-center p-6">
-                                        <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-6 ring-1 ring-white/20">
-                                            <Lock size={32} className="text-white/70" />
-                                        </div>
-                                        <h3 className="text-2xl font-bold text-white mb-2">Premium Episode</h3>
-                                        <p className="text-gray-400 mb-8 max-w-xs">
-                                            Subscribe to our plan to unlock this episode and continue watching.
-                                        </p>
-                                        <button 
-                                            onClick={() => router.push('/subscription')}
-                                            className="px-8 py-3 bg-gradient-to-r from-primary to-purple-600 hover:shadow-lg hover:shadow-primary/25 text-white font-bold rounded-xl transition-all flex items-center gap-2"
-                                        >
-                                            <Crown size={20} fill="currentColor" />
-                                            Unlock Now
-                                        </button>
-                                    </div>
-                                ) : (
-                                    // Active Player
-                                    <VideoPlayer
-                                        key={activeEpisode._id}
-                                        src={activeEpisode.video}
-                                        poster={activeEpisode.thumbnail}
-                                        isActive={true}
-                                        onEnded={handleVideoEnded}
-                                    />
-                                )
-                            )}
+                            {/* Active Player */}
+                            <VideoPlayer
+                                key={activeEpisode._id}
+                                src={activeEpisode.video}
+                                poster={activeEpisode.thumbnail}
+                                isActive={true}
+                                onEnded={handleVideoEnded}
+                            />
                             
                             {/* Overlay Title (Desktop) */}
-                            {!activeEpisode?.isLocked && (
-                                <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-start opacity-0 group-hover/player:opacity-100 transition-opacity duration-500 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
-                                    <div className="transform translate-y-[-10px] group-hover/player:translate-y-0 transition-transform duration-500">
-                                        <h3 className="text-white text-xl font-bold drop-shadow-lg tracking-tight">
-                                            Ep. {activeEpisode?.order} <span className="text-white/60 mx-1">|</span> {activeEpisode?.title}
-                                        </h3>
-                                    </div>
+                            <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-start opacity-0 group-hover/player:opacity-100 transition-opacity duration-500 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+                                <div className="transform translate-y-[-10px] group-hover/player:translate-y-0 transition-transform duration-500">
+                                    <h3 className="text-white text-xl font-bold drop-shadow-lg tracking-tight">
+                                        Ep. {activeEpisode?.order} <span className="text-white/60 mx-1">|</span> {activeEpisode?.title}
+                                    </h3>
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -349,6 +325,46 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                     </div>
                 </aside>
             </main>
+
+            {/* ✅ NEW: Global Lock Popup Modal */}
+            {showLockModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                    <div className="bg-[#161b22] border border-white/10 p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative">
+                        {/* Close Button */}
+                        <button 
+                            onClick={() => setShowLockModal(false)}
+                            className="absolute top-3 right-3 p-1 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-purple-600/10 flex items-center justify-center mx-auto mb-4 ring-1 ring-primary/20">
+                            <Crown size={32} className="text-primary drop-shadow-[0_0_10px_rgba(139,92,246,0.5)]" />
+                        </div>
+                        
+                        <h3 className="text-xl font-bold text-white mb-2">Free Limit Reached</h3>
+                        <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+                            You've watched all the free episodes. Subscribe now to unlock this series and enjoy unlimited streaming.
+                        </p>
+                        
+                        <div className="space-y-3">
+                            <button 
+                                onClick={() => router.push('/subscription')}
+                                className="w-full py-3 bg-gradient-to-r from-primary to-purple-600 hover:shadow-lg hover:shadow-primary/25 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2"
+                            >
+                                <Crown size={18} fill="currentColor" />
+                                Subscribe to Unlock
+                            </button>
+                            <button 
+                                onClick={() => setShowLockModal(false)}
+                                className="w-full py-2.5 bg-transparent hover:bg-white/5 rounded-xl font-medium text-gray-500 hover:text-white transition-colors text-sm"
+                            >
+                                Maybe Later
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

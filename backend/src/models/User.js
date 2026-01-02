@@ -11,6 +11,7 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: roles, default: 'viewer' },
     status: { type: String, enum: statuses, default: 'active'},
     lastActive: { type: Date, default: Date.now },
+    myList: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Series' }]
   },
   { timestamps: true }
 );

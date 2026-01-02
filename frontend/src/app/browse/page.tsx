@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import Navbar from '@/components/layout/Navbar';
-import { Loader2, Zap, Play } from 'lucide-react';
+import { Loader2, Play } from 'lucide-react';
 import { clsx } from 'clsx';
 
 function BrowseContent() {
@@ -13,6 +13,7 @@ function BrowseContent() {
   const router = useRouter();
   
   const initialQuery = searchParams.get('q') || '';
+  // 'genre' in URL maps to 'category' in Backend
   const initialGenre = searchParams.get('genre') || 'All';
 
   const [query, setQuery] = useState(initialQuery);
@@ -20,13 +21,15 @@ function BrowseContent() {
   const [loading, setLoading] = useState(true);
   const [activeGenre, setActiveGenre] = useState(initialGenre);
 
-  // Genre list
+  // Hardcoded list for UI (Make sure these match your Database Names!)
   const genres = ['All', 'Drama', 'Urban', 'Romance', 'Fantasy', 'Comedy', 'Thriller', 'Mystery', 'Sci-Fi', 'Action'];
 
   useEffect(() => {
-    // Sync local state if URL changes (e.g. searching from Navbar again)
     const urlQuery = searchParams.get('q') || '';
+    const urlGenre = searchParams.get('genre') || 'All';
+    
     if (urlQuery !== query) setQuery(urlQuery);
+    if (urlGenre !== activeGenre) setActiveGenre(urlGenre);
   }, [searchParams]);
 
   useEffect(() => {
@@ -34,28 +37,41 @@ function BrowseContent() {
       setLoading(true);
       try {
         const params: any = {};
-        if (query) params.q = query; // Sends 'q' to backend
-        if (activeGenre !== 'All') params.category = activeGenre; // Changed 'genre' to 'category' to match backend
+        if (query) params.q = query;
+        
+        // Map frontend 'genre' to backend 'category'
+        if (activeGenre !== 'All') {
+            params.category = activeGenre;
+        }
 
-        // ✅ UPDATE: Point to '/browse' to match our updated route file
+        // Call the endpoint. Ensure this route matches your backend router
         const res = await api.get('/browse', { params });
-        setResults(res.data.data);
+        setResults(res.data.data || []);
       } catch (err) {
-        console.error(err);
+        console.error("Fetch error:", err);
+        setResults([]);
       } finally {
         setLoading(false);
       }
     };
 
-    const debounce = setTimeout(fetchResults, 500);
+    const debounce = setTimeout(fetchResults, 300);
     return () => clearTimeout(debounce);
   }, [query, activeGenre]);
 
   const handleGenreClick = (genre: string) => {
     setActiveGenre(genre);
     const newParams = new URLSearchParams(searchParams.toString());
-    if (genre === 'All') newParams.delete('genre');
-    else newParams.set('genre', genre);
+    
+    if (genre === 'All') {
+        newParams.delete('genre');
+    } else {
+        newParams.set('genre', genre);
+    }
+    
+    // Reset search query if switching genres helps UX (optional, removed here to keep search)
+    // if (!query) newParams.delete('q');
+    
     router.replace(`/browse?${newParams.toString()}`);
   };
 
@@ -109,8 +125,14 @@ function BrowseContent() {
              <div className="flex justify-center py-40"><Loader2 className="animate-spin text-primary" size={48} /></div>
           ) : results.length === 0 ? (
              <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-white/10 rounded-3xl bg-white/5 mx-4">
-                <p className="text-gray-400 text-lg">No series found matching your criteria.</p>
-                <button onClick={() => {setQuery(''); setActiveGenre('All');}} className="mt-4 text-primary font-bold hover:underline">Clear Filters</button>
+                <p className="text-gray-400 text-lg">No series found.</p>
+                <p className="text-gray-500 text-sm mt-2">Try selecting "All" or a different category.</p>
+                <button 
+                   onClick={() => { setQuery(''); setActiveGenre('All'); router.replace('/browse'); }} 
+                   className="mt-4 text-primary font-bold hover:underline"
+                >
+                   Clear Filters
+                </button>
              </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700">

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import api from '@/lib/api'; // Your backend API client
+import api from '@/lib/api'; 
 
 export const uploadToCloudinary = async (file: File, resourceType: 'image' | 'video' = 'image') => {
   try {
@@ -16,21 +16,20 @@ export const uploadToCloudinary = async (file: File, resourceType: 'image' | 'vi
     formData.append('folder', folder);
 
     // 3. Upload directly to Cloudinary
-    // Note: We send to the specific resource type endpoint (image or video)
     const response = await axios.post(
       `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
-        onUploadProgress: (progressEvent) => {
-          // Optional: You can implement a progress bar here later
-          // const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          // console.log(percentCompleted);
-        }
       }
     );
 
-    return response.data.secure_url;
+    // ✅ UPDATED: Return object with URL and Duration
+    return {
+        url: response.data.secure_url,
+        duration: response.data.duration || 0, // Duration in seconds
+        format: response.data.format
+    };
   } catch (error) {
     console.error('Cloudinary upload failed:', error);
     throw new Error('Upload failed');

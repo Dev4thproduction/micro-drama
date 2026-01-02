@@ -35,7 +35,7 @@ app.use('/admin', adminRoutes);
 app.use('/content', contentRoutes);
 app.use('/subscriptions', subscriptionRoutes);
 app.use('/browse', browseRoutes);
-
+app.use('/uploads', uploadRoutes);
 app.use((req, res) => {
   res.status(404).json({ message: 'Not Found' });
 });

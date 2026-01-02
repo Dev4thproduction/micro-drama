@@ -9,7 +9,7 @@ const EpisodeSchema = new mongoose.Schema({
   order: { type: Number, required: true }, 
   video: { type: String, required: true }, // URL from Cloudinary
   thumbnail: { type: String, default: '' },
-  
+  duration: { type: Number, default: 0 },
   releaseDate: { type: Date, default: Date.now },
   status: { type: String, enum: ['draft', 'published', 'archived'], default: 'published' }
 }, { timestamps: true });

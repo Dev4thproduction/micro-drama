@@ -12,8 +12,6 @@ import { useState, useEffect } from 'react';
 import { clsx } from 'clsx';
 
 export default function HomePage() {
-  // Note: 'user', 'logout', and 'router' are removed from here 
-  // because the Navbar component now handles auth and navigation.
   
   // Data State
   const [data, setData] = useState<any>({ featured: [], trending: [], genres: [] });
@@ -97,7 +95,8 @@ export default function HomePage() {
                 </p>
 
                 <div className="flex items-center gap-4 pt-4">
-                  <Link href={`/watch/${item._id}`}>
+                  {/* ✅ FIXED: Changed Link to point to the Series Details Page */}
+                  <Link href={`/series/${item._id}`}>
                     <button className="h-14 px-8 rounded-2xl bg-white text-black font-bold hover:bg-gray-200 transition-all flex items-center gap-3 shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 active:scale-95">
                       <Play size={20} fill="currentColor" /> Watch Now
                     </button>

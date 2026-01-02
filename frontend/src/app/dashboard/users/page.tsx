@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { 
-  Search, Filter, Shield, UserCheck, Zap, Ban, 
+  Search, Shield, UserCheck, Ban, 
   ChevronLeft, ChevronRight, Loader2 
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -14,23 +14,30 @@ export default function UserManagementPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('All');
 
-const fetchUsers = async () => {
+  const fetchUsers = async () => {
     setLoading(true);
     try {
+      // Map 'User' tab to 'viewer' role for the backend
+      let roleParam = undefined;
+      if (activeTab === 'User') roleParam = 'viewer';
+      if (activeTab === 'Admin') roleParam = 'admin';
+      
       const res = await api.get('/admin/users', {
-        params: { page, search, role: roleFilter === 'all' ? undefined : roleFilter }
+        params: { 
+          page, 
+          search, 
+          role: roleParam 
+        }
       });
       
-      // FIX 1: The users array is directly in `res.data.data`
-      // FIX 2: Pagination info is in `res.data.meta`
       setUsers(res.data.data || []); 
       setTotalPages(res.data.meta?.totalPages || 1);
       
     } catch (err) {
-      console.error(err);
-      setUsers([]); // Fallback to empty array on error to prevent map crash
+      console.error("Failed to fetch users:", err);
+      setUsers([]); 
     } finally {
       setLoading(false);
     }
@@ -38,11 +45,11 @@ const fetchUsers = async () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [page, roleFilter]); // Re-fetch on page/filter change
-  console.log(users);
+  }, [page, activeTab]); 
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(1); // Reset to page 1 on new search
+    setPage(1); 
     fetchUsers();
   };
 
@@ -50,7 +57,6 @@ const fetchUsers = async () => {
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
     try {
       await api.patch(`/admin/users/${userId}/status`, { status: newStatus });
-      // Update local state to reflect change immediately
       setUsers((prev: any) => prev.map((u: any) => 
         u._id === userId ? { ...u, status: newStatus } : u
       ));
@@ -82,15 +88,15 @@ const fetchUsers = async () => {
       {/* TABLE */}
       <div className="bg-[#161b22] border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
         
-        {/* TABS */}
+        {/* TABS - NO CREATOR */}
         <div className="flex items-center gap-6 px-6 border-b border-white/5 text-sm font-medium overflow-x-auto">
-          {['All', 'Creator', 'Viewer', 'Admin'].map((tab) => (
+          {['All', 'User', 'Admin'].map((tab) => (
             <button 
               key={tab}
-              onClick={() => { setRoleFilter(tab.toLowerCase()); setPage(1); }}
+              onClick={() => { setActiveTab(tab); setPage(1); }}
               className={clsx(
                 "py-4 border-b-2 transition-colors whitespace-nowrap",
-                roleFilter === tab.toLowerCase() 
+                activeTab === tab 
                   ? "border-primary text-white" 
                   : "border-transparent text-gray-500 hover:text-white"
               )}
@@ -115,52 +121,56 @@ const fetchUsers = async () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-sm">
-                {users.map((user: any) => (
-                  <tr key={user._id} className="group hover:bg-white/[0.02]">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white font-bold text-sm">
-                          {user.email[0].toUpperCase()}
+                {users.length === 0 ? (
+                    <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">No users found.</td></tr>
+                ) : (
+                    users.map((user: any) => (
+                    <tr key={user._id} className="group hover:bg-white/[0.02]">
+                        <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                            <div className="size-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white font-bold text-sm">
+                            {user.email?.[0]?.toUpperCase() || 'U'}
+                            </div>
+                            <div>
+                            <div className="font-bold text-white">{user.displayName || 'No Name'}</div>
+                            <div className="text-xs text-gray-500">{user.email}</div>
+                            </div>
                         </div>
-                        <div>
-                          <div className="font-bold text-white">{user.displayName || 'No Name'}</div>
-                          <div className="text-xs text-gray-500">{user.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={clsx(
-                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border",
-                        user.role === 'admin' && "bg-blue-500/10 text-blue-400 border-blue-500/20",
-                        user.role === 'creator' && "bg-purple-500/10 text-purple-400 border-purple-500/20",
-                        user.role === 'viewer' && "bg-gray-500/10 text-gray-400 border-gray-500/20",
-                      )}>
-                        {user.role === 'admin' ? <Shield size={12}/> : user.role === 'creator' ? <Zap size={12}/> : <UserCheck size={12}/>}
-                        {user.role.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={clsx("text-xs font-bold", user.status === 'active' ? "text-emerald-400" : "text-red-400")}>
-                        {user.status.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-500 text-xs">
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                       <button 
-                         onClick={() => toggleStatus(user._id, user.status)}
-                         className={clsx(
-                           "p-2 rounded-lg transition-colors",
-                           user.status === 'active' ? "bg-red-500/10 text-red-400 hover:bg-red-500/20" : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                         )}
-                         title={user.status === 'active' ? 'Suspend User' : 'Activate User'}
-                       >
-                         {user.status === 'active' ? <Ban size={16} /> : <UserCheck size={16} />}
-                       </button>
-                    </td>
-                  </tr>
-                ))}
+                        </td>
+                        <td className="px-6 py-4">
+                        <span className={clsx(
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border",
+                            user.role === 'admin' 
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500/20" 
+                            : "bg-gray-500/10 text-gray-400 border-gray-500/20" // Default for Viewer/User
+                        )}>
+                            {user.role === 'admin' ? <Shield size={12}/> : <UserCheck size={12}/>}
+                            {user.role === 'viewer' ? 'USER' : user.role.toUpperCase()}
+                        </span>
+                        </td>
+                        <td className="px-6 py-4">
+                        <span className={clsx("text-xs font-bold", user.status === 'active' ? "text-emerald-400" : "text-red-400")}>
+                            {user.status.toUpperCase()}
+                        </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 text-xs">
+                        {new Date(user.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                        <button 
+                            onClick={() => toggleStatus(user._id, user.status)}
+                            className={clsx(
+                            "p-2 rounded-lg transition-colors",
+                            user.status === 'active' ? "bg-red-500/10 text-red-400 hover:bg-red-500/20" : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                            )}
+                            title={user.status === 'active' ? 'Suspend User' : 'Activate User'}
+                        >
+                            {user.status === 'active' ? <Ban size={16} /> : <UserCheck size={16} />}
+                        </button>
+                        </td>
+                    </tr>
+                    ))
+                )}
               </tbody>
             </table>
           </div>
