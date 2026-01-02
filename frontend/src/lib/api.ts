@@ -49,6 +49,26 @@ export const deleteEpisode = async (id: string) => {
   return response.data;
 };
 
+export const getMyList = async () => {
+  const response = await api.get('/users/mylist');
+  return response.data;
+};
+
+export const addToMyList = async (seriesId: string) => {
+  const response = await api.post(`/users/mylist/${seriesId}`);
+  return response.data;
+};
+
+export const removeFromMyList = async (seriesId: string) => {
+  const response = await api.delete(`/users/mylist/${seriesId}`);
+  return response.data;
+};
+
+export const checkMyListStatus = async (seriesId: string) => {
+  const response = await api.get(`/users/mylist/check/${seriesId}`);
+  return response.data;
+};
+
 // ... existing exports
 
 export default api;

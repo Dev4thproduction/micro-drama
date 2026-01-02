@@ -9,6 +9,7 @@ const videoRoutes = require('./src/routes/video.routes');
 const adminRoutes = require('./src/routes/admin.routes');
 const contentRoutes = require('./src/routes/content.routes');
 const subscriptionRoutes = require('./src/routes/subscription.routes');
+const userRoutes = require('./src/routes/user.routes');
 const errorHandler = require('./src/middleware/errorHandler');
 const requestLogger = require('./src/middleware/requestLogger');
 const browseRoutes = require('./src/routes/browse.routes');
@@ -27,7 +28,7 @@ app.use('/health', healthRoutes);
 app.use('/auth', authRoutes);
 
 // ✅ CHANGE THIS LINE (remove the 's')
-app.use('/upload', uploadRoutes); 
+app.use('/upload', uploadRoutes);
 
 app.use('/creator', creatorRoutes);
 app.use('/video', videoRoutes);
@@ -35,6 +36,7 @@ app.use('/admin', adminRoutes);
 app.use('/content', contentRoutes);
 app.use('/subscriptions', subscriptionRoutes);
 app.use('/browse', browseRoutes);
+app.use('/users', userRoutes);
 app.use('/uploads', uploadRoutes);
 app.use((req, res) => {
   res.status(404).json({ message: 'Not Found' });
