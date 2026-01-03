@@ -2,19 +2,37 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { DollarSign, TrendingUp, Search, Crown, ChevronLeft, ChevronRight, Loader2, Zap } from 'lucide-react';
+import {
+  DollarSign,
+  TrendingUp,
+  Search,
+  Crown,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Zap,
+  BarChart3,
+  Wallet,
+  Target,
+  Sparkles,
+  CreditCard
+} from 'lucide-react';
 import { clsx } from 'clsx';
+import PeriodicChart from '@/components/dashboard/PeriodicChart';
+import DashboardFilter, { FilterResult } from '@/components/dashboard/DashboardFilter';
 
 export default function SubscriptionsPage() {
   const [subs, setSubs] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const [globalFilter, setGlobalFilter] = useState<FilterResult | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [planFilter, setPlanFilter] = useState<'all' | 'monthly' | 'weekly'>('all');
-  const [revenuePeriod, setRevenuePeriod] = useState<'monthly' | 'weekly'>('monthly');
+  const [revenueTrend, setRevenueTrend] = useState<any[]>([]);
+  const [chartLoading, setChartLoading] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -26,23 +44,34 @@ export default function SubscriptionsPage() {
   }, [search]);
 
   useEffect(() => {
+    if (!globalFilter) return;
+
     const loadData = async () => {
       setLoading(true);
       try {
-        const [statsRes, subsRes] = await Promise.all([
-          api.get('/admin/stats'),
+        const commonParams = {
+          startDate: globalFilter.startDate,
+          endDate: globalFilter.endDate,
+          period: globalFilter.period
+        };
+
+        const [statsRes, subsRes, trendRes] = await Promise.all([
+          api.get('/admin/stats', { params: commonParams }),
           api.get('/admin/subscriptions', {
             params: {
+              ...commonParams,
               page,
               search: debouncedSearch,
               plan: planFilter === 'all' ? undefined : planFilter
             }
-          })
+          }),
+          api.get('/admin/revenue/periodic', { params: commonParams })
         ]);
 
         setStats(statsRes.data.data.stats || {});
         setSubs(subsRes.data.data || []);
         setTotalPages(subsRes.data.meta?.totalPages || 1);
+        setRevenueTrend(trendRes.data?.data ?? trendRes.data ?? []);
       } catch (err) {
         console.error("Failed to fetch subscription data:", err);
       } finally {
@@ -50,83 +79,128 @@ export default function SubscriptionsPage() {
       }
     };
     loadData();
-  }, [page, debouncedSearch, planFilter]);
+  }, [page, debouncedSearch, planFilter, globalFilter]);
 
-  const currentRevenue = revenuePeriod === 'monthly'
+  const handleFilterChange = (filter: FilterResult) => {
+    setGlobalFilter(filter);
+    setPage(1);
+  };
+
+  const handleRefresh = () => {
+    if (globalFilter) {
+      setPage(1);
+      // The dependency in useEffect will handle the update
+    }
+  };
+
+  const formatINR = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const currentRevenue = globalFilter?.period === 'monthly'
     ? (stats.monthlyRevenue || stats.revenue || 0)
     : (stats.weeklyRevenue || 0);
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
-      <div className="flex flex-col md:flex-row justify-between gap-4 items-end">
+      <div className="flex flex-col md:flex-row justify-between gap-4 sm:items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Subscriptions & Revenue</h1>
-          <p className="text-gray-400 mt-1">Manage billing and track revenue.</p>
-        </div>
-
-        {/* REVENUE PERIOD TOGGLE */}
-        <div className="flex items-center gap-1 bg-[#161b22] border border-white/10 p-1 rounded-xl">
-          <button
-            onClick={() => setRevenuePeriod('weekly')}
-            className={clsx(
-              "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
-              revenuePeriod === 'weekly' ? "bg-primary text-white" : "text-gray-500 hover:text-white"
-            )}
-          >
-            Weekly
-          </button>
-          <button
-            onClick={() => setRevenuePeriod('monthly')}
-            className={clsx(
-              "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
-              revenuePeriod === 'monthly' ? "bg-primary text-white" : "text-gray-500 hover:text-white"
-            )}
-          >
-            Monthly
-          </button>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Subscriptions & Revenue</h1>
+          <p className="text-gray-400 mt-1">Manage billing and track revenue analytics.</p>
         </div>
       </div>
+
+      <DashboardFilter
+        onChange={handleFilterChange}
+        onRefresh={handleRefresh}
+        loading={loading}
+      />
 
       {/* STATS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* REVENUE CARD */}
-        <div className="bg-[#161b22] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-16 bg-blue-500/10 rounded-full blur-[40px] group-hover:bg-blue-500/20 transition-colors"></div>
+        <div className="group relative overflow-hidden rounded-2xl border border-white/[0.03] bg-[#161b22] p-6 shadow-xl transition-all hover:bg-white/[0.04]">
+          <div className="absolute -right-4 -top-4 h-32 w-32 rounded-full bg-blue-500/10 blur-3xl transition-all group-hover:bg-blue-500/20" />
           <div className="relative z-10">
-            <div className="flex justify-between mb-4">
-              <div className="p-3 rounded-xl bg-blue-500/10 text-blue-500 font-bold text-lg">
-                <TrendingUp size={20} />
+            <div className="flex justify-between items-start mb-6">
+              <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20 shadow-lg">
+                <Wallet size={24} />
               </div>
-              <span className="bg-blue-500/10 text-blue-400 text-xs font-bold px-2 py-1 rounded-full border border-blue-500/20 uppercase tracking-wider">
-                {revenuePeriod} MRR
+              <span className="bg-blue-500/10 text-blue-400 text-[10px] font-black px-2.5 py-1 rounded-full border border-blue-500/20 uppercase tracking-widest">
+                {globalFilter?.period} MRR
               </span>
             </div>
-            <h3 className="text-3xl font-bold text-white">₹{(currentRevenue || 0).toLocaleString('en-IN')}</h3>
-            <p className="text-sm text-gray-500">Estimated {revenuePeriod} Revenue</p>
+            <h3 className="text-3xl font-black text-white">{loading ? <Loader2 size={24} className="animate-spin text-gray-500" /> : formatINR(currentRevenue)}</h3>
+            <p className="mt-2 text-xs font-bold uppercase tracking-widest text-gray-500">Estimated {globalFilter?.period} Revenue</p>
+            <div className="mt-4 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-tighter text-blue-400/80">
+              <TrendingUp size={12} /> Live Tracking
+            </div>
           </div>
         </div>
 
         {/* REVENUE CARD - TOTAL */}
-        <div className="bg-[#161b22] border border-white/5 rounded-2xl p-6 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-16 bg-emerald-500/10 rounded-full blur-[40px] group-hover:bg-emerald-500/20 transition-colors"></div>
+        <div className="group relative overflow-hidden rounded-2xl border border-white/[0.03] bg-[#161b22] p-6 shadow-xl transition-all hover:bg-white/[0.04]">
+          <div className="absolute -right-4 -top-4 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl transition-all group-hover:bg-emerald-500/20" />
           <div className="relative z-10">
-            <div className="flex justify-between mb-4">
-              <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500 font-bold text-lg">₹</div>
-              <span className="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-2 py-1 rounded-full border border-emerald-500/20 whitespace-nowrap">Lifetime Revenue</span>
+            <div className="flex justify-between items-start mb-6">
+              <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20 shadow-lg">
+                <Target size={24} />
+              </div>
+              <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-2.5 py-1 rounded-full border border-emerald-500/20 uppercase tracking-widest">
+                Lifetime Revenue
+              </span>
             </div>
-            <h3 className="text-3xl font-bold text-white">₹{(stats.totalRevenue || 0).toLocaleString('en-IN')}</h3>
-            <p className="text-sm text-gray-500">Gross Platform Revenue</p>
+            <h3 className="text-3xl font-black text-white">{loading ? <Loader2 size={24} className="animate-spin text-gray-500" /> : formatINR(stats.totalRevenue || 0)}</h3>
+            <p className="mt-2 text-xs font-bold uppercase tracking-widest text-gray-500">Gross Platform Earnings</p>
+            <div className="mt-4 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-tighter text-emerald-400/80">
+              <Sparkles size={12} /> Accumulative
+            </div>
           </div>
         </div>
 
         {/* ACTIVE SUBSCRIBERS */}
-        <div className="bg-[#161b22] border border-white/5 rounded-2xl p-6">
-          <div className="flex justify-between mb-4">
-            <div className="p-3 rounded-xl bg-purple-500/10 text-purple-500"><Crown size={22} /></div>
+        <div className="group relative overflow-hidden rounded-2xl border border-white/[0.03] bg-[#161b22] p-6 shadow-xl transition-all hover:bg-white/[0.04]">
+          <div className="absolute -right-4 -top-4 h-32 w-32 rounded-full bg-purple-500/10 blur-3xl transition-all group-hover:bg-purple-500/20" />
+          <div className="relative z-10">
+            <div className="flex justify-between items-start mb-6">
+              <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400 ring-1 ring-purple-500/20 shadow-lg">
+                <Crown size={24} />
+              </div>
+              <span className="bg-purple-500/10 text-purple-400 text-[10px] font-black px-2.5 py-1 rounded-full border border-purple-500/20 uppercase tracking-widest">
+                Active Users
+              </span>
+            </div>
+            <h3 className="text-3xl font-black text-white">{loading ? <Loader2 size={24} className="animate-spin text-gray-500" /> : (stats.activeSubscribers || 0).toLocaleString('en-IN')}</h3>
+            <p className="mt-2 text-xs font-bold uppercase tracking-widest text-gray-500">Current Premium Members</p>
+            <div className="mt-4 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-tighter text-purple-400/80">
+              <Zap size={12} /> Paying Base
+            </div>
           </div>
-          <h3 className="text-3xl font-bold text-white">{stats.activeSubscribers || 0}</h3>
-          <p className="text-sm text-gray-500">Total Active Subscribers</p>
         </div>
+      </div>
+
+      {/* REVENUE CHART */}
+      <div className="bg-[#161b22] border border-white/5 rounded-2xl p-6 shadow-xl">
+        <div className="mb-6">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-1">
+            <BarChart3 size={14} className="text-primary" />
+            Revenue Analytics
+          </div>
+          <h2 className="text-xl font-bold text-white tracking-tighter">Performance Trend</h2>
+          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1">{globalFilter?.label || 'Historical'}</p>
+        </div>
+
+        <PeriodicChart
+          data={revenueTrend}
+          type="bar"
+          color="#10b981"
+          loading={chartLoading}
+          valueFormatter={(v) => `₹${v.toLocaleString('en-IN')}`}
+        />
       </div>
 
       {/* TABLE */}

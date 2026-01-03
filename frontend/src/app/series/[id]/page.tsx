@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import {
@@ -11,7 +11,8 @@ import {
   Lock,
   Loader2,
   ChevronLeft,
-  Crown
+  Crown,
+  ChevronDown
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -24,6 +25,9 @@ export default function SeriesDetailsPage() {
   const [error, setError] = useState('');
   const [isInList, setIsInList] = useState(false);
   const [togglingList, setTogglingList] = useState(false);
+
+  // Season State
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('all');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -48,6 +52,15 @@ export default function SeriesDetailsPage() {
     if (id) fetchData();
   }, [id]);
 
+  // Set initial season when data loads
+  useEffect(() => {
+    if (data?.seasons && data.seasons.length > 0) {
+      setSelectedSeasonId(data.seasons[0]._id);
+    } else {
+      setSelectedSeasonId('all');
+    }
+  }, [data]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#000000] flex items-center justify-center">
@@ -68,7 +81,12 @@ export default function SeriesDetailsPage() {
     );
   }
 
-  const { series, episodes = [] } = data;
+  const { series, episodes = [], seasons = [] } = data;
+
+  // Filter episodes based on selection
+  const filteredEpisodes = selectedSeasonId === 'all'
+    ? episodes
+    : episodes.filter((ep: any) => ep.season === selectedSeasonId || (typeof ep.season === 'object' && ep.season?._id === selectedSeasonId));
 
   const toggleMyList = async () => {
     try {
@@ -118,7 +136,7 @@ export default function SeriesDetailsPage() {
             <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 text-sm md:text-base text-gray-300">
               <span className="border border-gray-500 px-1.5 py-0.5 rounded text-xs font-semibold">13+</span>
               <span>•</span>
-              <span>{episodes.length > 0 ? '1 Season' : 'Coming Soon'}</span>
+              <span>{seasons.length > 0 ? `${seasons.length} Season${seasons.length > 1 ? 's' : ''}` : `${episodes.length} Episodes`}</span>
               <span>•</span>
               <span>{series.category || 'Drama'}</span>
               <span>•</span>
@@ -184,10 +202,35 @@ export default function SeriesDetailsPage() {
 
         {/* --- EPISODES GRID --- */}
         <section>
-          <h2 className="text-2xl font-bold text-white mb-6 pl-1">{episodes.length} Episodes</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-white pl-1">
+              {selectedSeasonId === 'all'
+                ? `${episodes.length} Episodes`
+                : seasons.find((s: any) => s._id === selectedSeasonId)?.title || 'Episodes'
+              }
+            </h2>
+
+            {/* Season Selector Dropdown */}
+            {seasons.length > 1 && (
+              <div className="relative">
+                <select
+                  value={selectedSeasonId}
+                  onChange={(e) => setSelectedSeasonId(e.target.value)}
+                  className="appearance-none bg-[#1A1A1A] border border-white/10 rounded-lg px-4 py-2 pr-10 text-sm font-semibold text-white focus:outline-none focus:border-[#8B5CF6] transition-colors cursor-pointer"
+                >
+                  {seasons.map((season: any) => (
+                    <option key={season._id} value={season._id} className="bg-[#1A1A1A]">
+                      Season {season.number}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {episodes.map((ep: any) => {
+            {filteredEpisodes.map((ep: any) => {
               // ✅ FIXED: Use the backend's `isLocked` property directly
               const isLocked = ep.isLocked;
 
@@ -260,9 +303,11 @@ export default function SeriesDetailsPage() {
             })}
           </div>
 
-          {episodes.length === 0 && !loading && (
+          {filteredEpisodes.length === 0 && !loading && (
             <div className="w-full py-12 text-center text-gray-500 border border-dashed border-gray-800 rounded-xl">
-              No episodes uploaded yet.
+              {seasons.length > 0 && selectedSeasonId !== 'all'
+                ? "No episodes found for this season."
+                : "No episodes uploaded yet."}
             </div>
           )}
         </section>

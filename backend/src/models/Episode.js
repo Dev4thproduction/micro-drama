@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const EpisodeSchema = new mongoose.Schema({
   series: { type: mongoose.Schema.Types.ObjectId, ref: 'Series', required: true },
+  season: { type: mongoose.Schema.Types.ObjectId, ref: 'Season', default: null }, // Link to season
   title: { type: String, required: true, trim: true },
   synopsis: { type: String, default: '' },
 
@@ -11,11 +12,12 @@ const EpisodeSchema = new mongoose.Schema({
   thumbnail: { type: String, default: '' },
   views: { type: Number, default: 0 },
   duration: { type: Number, default: 0 },
+  isFree: { type: Boolean, default: false },
   releaseDate: { type: Date, default: Date.now },
   status: { type: String, enum: ['draft', 'published', 'archived'], default: 'published' }
 }, { timestamps: true });
 
 // Ensure unique episode numbers per series
-EpisodeSchema.index({ series: 1, order: 1 }, { unique: true });
+EpisodeSchema.index({ series: 1, season: 1, order: 1 }, { unique: true });
 
 module.exports = mongoose.model('Episode', EpisodeSchema);

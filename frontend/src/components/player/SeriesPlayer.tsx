@@ -20,6 +20,7 @@ interface Episode {
     thumbnail: string;
     duration?: number;
     isLocked?: boolean;
+    season?: string | { _id: string };
 }
 
 interface SeriesPlayerProps {
@@ -28,9 +29,16 @@ interface SeriesPlayerProps {
 
 export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
     const router = useRouter();
-    const [episodes, setEpisodes] = useState<Episode[]>([]);
+    const [allEpisodes, setAllEpisodes] = useState<Episode[]>([]);
+    const [seasons, setSeasons] = useState<any[]>([]);
+    const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
     const [seriesInfo, setSeriesInfo] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+
+    // Filtered episodes based on season
+    const episodes = selectedSeasonId
+        ? allEpisodes.filter(ep => (typeof ep.season === 'object' ? (ep.season as any)?._id : ep.season) === selectedSeasonId)
+        : allEpisodes;
 
     // ✅ NEW: State for the Lock Modal
     const [showLockModal, setShowLockModal] = useState(false);
@@ -51,6 +59,7 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
     };
 
     const saveWatchHistory = async (progress: number, completed: boolean) => {
+        if (!activeEpisode) return;
         try {
             await api.post('/users/history', {
                 episodeId: activeEpisode._id,
@@ -84,19 +93,27 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                 // Extract Series ID (handles both populated object or string ID)
                 const fetchedSeriesId = currentEpData.series._id || currentEpData.series;
 
-                // STEP 2: Fetch the full series playlist
+                // STEP 2: Fetch the full series playlist and seasons
                 const listRes = await api.get(`/content/series/${fetchedSeriesId}`);
 
-                const { series, episodes: epList } = listRes.data.data ?? listRes.data;
+                const { series, episodes: epList, seasons: seasonsList } = listRes.data.data ?? listRes.data;
 
                 setSeriesInfo(series);
-                setEpisodes(epList || []);
+                setSeasons(seasonsList || []);
+                setAllEpisodes(epList || []);
 
-                // STEP 3: Set the player to the correct episode
-                const startingIndex = epList.findIndex((e: any) => e._id === episodeId);
-                if (startingIndex !== -1) {
-                    setActiveIndex(startingIndex);
+                // STEP 3: Set initial season based on current episode
+                const currentEpSeasonId = typeof currentEpData.season === 'object' ? currentEpData.season?._id : currentEpData.season;
+                if (currentEpSeasonId) {
+                    setSelectedSeasonId(currentEpSeasonId);
+                } else if (seasonsList.length > 0) {
+                    setSelectedSeasonId(seasonsList[0]._id);
                 }
+
+                // STEP 4: Set the player to the correct episode within the filtered list
+                // We'll calculate index after state updates in a separate effect or just here
+                // But it's easier to find it in the full list first, then filter.
+                // Actually, let's just use the epList directly for finding the index relative to the filtered list.
 
             } catch (err) {
                 console.error("Failed to load player data", err);
@@ -107,6 +124,20 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
 
         if (episodeId) initPlayer();
     }, [episodeId]);
+
+    // Update active index when season or allEpisodes change
+    useEffect(() => {
+        if (episodeId && episodes.length > 0) {
+            const idx = episodes.findIndex(e => e._id === episodeId);
+            if (idx !== -1) {
+                setActiveIndex(idx);
+            } else if (episodes.length > 0 && !activeEpisode) {
+                // If current episode isn't in this season, we don't necessarily want to jump to the first one
+                // unless the user intentionally switched seasons.
+                // For now, let's leave it.
+            }
+        }
+    }, [selectedSeasonId, allEpisodes, episodeId]);
 
     const handleVideoEnded = async () => {
         // Save completion status
@@ -262,10 +293,27 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                         </div>
                     </div>
 
+                    {/* Season Selector */}
+                    {seasons.length > 1 && (
+                        <div className="px-6 py-2 border-b border-white/5 bg-black/40">
+                            <select
+                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary appearance-none cursor-pointer"
+                                value={selectedSeasonId}
+                                onChange={(e) => setSelectedSeasonId(e.target.value)}
+                            >
+                                {seasons.map(s => (
+                                    <option key={s._id} value={s._id} className="bg-[#1c2128]">
+                                        Season {s.number}: {s.title}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     {/* Episode List Header */}
                     <div className="px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/20">
                         <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
-                            <MoreHorizontal size={16} /> Playlist
+                            <MoreHorizontal size={16} /> Playlist {selectedSeasonId && seasons.length > 1 && `(S${seasons.find(s => s._id === selectedSeasonId)?.number})`}
                         </h3>
                         <div className="flex gap-1">
                             <button

@@ -82,6 +82,7 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
         setStatus('Uploading Episode Video...');
         const videoRes = await uploadToCloudinary(epVideo, 'video');
         const episodeVideoUrl = videoRes.url;
+        const episodeDuration = Math.round(videoRes.duration || 0);
 
         let episodeThumbUrl = '';
         if (epThumbnail) {
@@ -97,7 +98,8 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
           synopsis: epData.synopsis,
           order: parseInt(epData.order) || 1, // ✅ Use custom order
           video: episodeVideoUrl,
-          thumbnail: episodeThumbUrl || coverImageUrl // Fallback to series cover
+          thumbnail: episodeThumbUrl || coverImageUrl, // Fallback to series cover
+          duration: episodeDuration
         });
       }
 
@@ -239,6 +241,17 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
                             value={epData.title} onChange={e => setEpData({ ...epData, title: e.target.value })}
                           />
                         </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-gray-300 ml-1">Episode Synopsis</label>
+                        <textarea
+                          rows={2}
+                          placeholder="What happens in this episode?"
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none resize-none"
+                          value={epData.synopsis}
+                          onChange={e => setEpData({ ...epData, synopsis: e.target.value })}
+                        />
                       </div>
 
                       <div className="space-y-2">

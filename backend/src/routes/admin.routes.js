@@ -15,6 +15,8 @@ if (allowRoles) {
 // --- DASHBOARD & ANALYTICS ---
 router.get('/stats', adminController.getDashboardStats);
 router.get('/analytics', adminController.getAnalytics);
+router.get('/analytics/periodic', adminController.getPeriodicAnalytics);
+router.get('/analytics/content', adminController.getContentAnalytics);
 
 // --- USER MANAGEMENT ---
 router.get('/users', adminController.getUsers);
@@ -32,6 +34,7 @@ router.patch('/reject-episode/:episodeId', adminController.rejectEpisode);
 
 // --- SUBSCRIPTIONS ---
 router.get('/subscriptions', adminController.getSubscribers);
+router.get('/revenue/periodic', adminController.getPeriodicRevenue);
 router.post('/users/:userId/subscription', adminController.toggleSubscription);
 
 // --- CMS: CONTENT MANAGEMENT (Series, Seasons, Episodes) ---
@@ -40,6 +43,8 @@ router.get('/series', contentController.getAllSeries);
 // Seasons
 router.get('/series/:seriesId/seasons', contentController.getSeasons);
 router.post('/series/:seriesId/seasons', contentController.createSeason);
+router.patch('/seasons/:id', contentController.updateSeason);
+router.delete('/seasons/:id', contentController.deleteSeason);
 
 // Episodes
 router.get('/series/:seriesId/episodes', contentController.getAdminEpisodes);

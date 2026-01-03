@@ -1,6 +1,7 @@
 const { Types } = require('mongoose');
 const Series = require('../models/Series');
 const Episode = require('../models/Episode');
+const Season = require('../models/Season');
 const Video = require('../models/Video');
 const Category = require('../models/Category');
 const { sendSuccess } = require('../utils/response');
@@ -25,6 +26,16 @@ const createSeries = async (req, res, next) => {
       creator: creatorId,
       status: 'published' // Auto-publish for CMS admin convenience
     });
+
+    // Create Season 1 by default if it's a series
+    if (content.type === 'series') {
+      await Season.create({
+        series: content._id,
+        number: 1,
+        title: 'Season 1',
+        status: 'published'
+      });
+    }
 
     return sendSuccess(res, content);
   } catch (err) {
@@ -78,7 +89,7 @@ const createEpisode = async (req, res, next) => {
   try {
     const creatorId = req.user.id;
     const { seriesId } = req.params;
-    const { title, synopsis, order, releaseDate, video, thumbnail } = req.body;
+    const { title, synopsis, order, releaseDate, video, thumbnail, duration, isFree, seasonId } = req.body;
 
     console.log(`[CMS] Creating Episode for Series: ${seriesId}`);
 
@@ -92,15 +103,31 @@ const createEpisode = async (req, res, next) => {
     if (!series) return next({ status: 404, message: 'Series not found' });
     if (series.creator.toString() !== creatorId) return next({ status: 403, message: 'Access denied' });
 
+    // If seasonId is provided, verify it belongs to this series
+    let finalSeasonId = seasonId;
+    if (finalSeasonId) {
+      const season = await Season.findOne({ _id: finalSeasonId, series: seriesId });
+      if (!season) return next({ status: 400, message: 'Invalid season for this series' });
+    } else {
+      // Default to Season 1 if it exists
+      const season1 = await Season.findOne({ series: seriesId, number: 1 });
+      if (season1) {
+        finalSeasonId = season1._id;
+      }
+    }
+
     // Create Episode
     const episode = await Episode.create({
       series: seriesId,
+      season: finalSeasonId || null,
       title,
       synopsis,
       order: Number(order) || 1, // Ensure number
       releaseDate: releaseDate || Date.now(),
       video, // URL from Cloudinary
       thumbnail: thumbnail || series.coverImage, // Fallback to series cover
+      duration: Number(duration) || 0,
+      isFree: isFree === true || isFree === 'true',
       status: 'published'
     });
 
@@ -109,7 +136,7 @@ const createEpisode = async (req, res, next) => {
     console.error("CREATE EPISODE ERROR:", err);
     // Handle Duplicate Key Error (Unique Episode Number)
     if (err.code === 11000) {
-      return next({ status: 400, message: `Episode number ${req.body.order} already exists for this series.` });
+      return next({ status: 400, message: `Episode number ${req.body.order} already exists in this season/series.` });
     }
     return next(err);
   }

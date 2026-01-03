@@ -111,16 +111,20 @@ const getSeriesDetails = async (req, res, next) => {
       if (subscription) isSubscribed = true;
     }
 
-    const episodes = await Episode.find({ series: seriesId, status: 'published' }).sort({ order: 1 });
+    const [episodes, seasons] = await Promise.all([
+      Episode.find({ series: seriesId, status: 'published' }).sort({ order: 1 }),
+      Season.find({ series: seriesId, status: { $ne: 'archived' } }).sort({ number: 1 })
+    ]);
 
     // ✅ Map DB fields to Frontend fields AND apply locks
     const episodesWithLock = episodes.map(ep => {
       const formatted = formatEpisode(ep);
-      formatted.isLocked = !isSubscribed && formatted.order > 2;
+      // Episode is locked if it's NOT free AND user is NOT subscribed
+      formatted.isLocked = !formatted.isFree && !isSubscribed;
       return formatted;
     });
 
-    return sendSuccess(res, { series, episodes: episodesWithLock });
+    return sendSuccess(res, { series, episodes: episodesWithLock, seasons });
   } catch (err) { return next(err); }
 };
 
@@ -133,7 +137,7 @@ const getEpisodeDetails = async (req, res, next) => {
     const episode = await Episode.findOne({ _id: episodeId, status: 'published' }).populate('series');
     if (!episode) return next({ status: 404, message: 'Episode not found' });
 
-    if (episode.order > 2) {
+    if (!episode.isFree) {
       if (!userId) return next({ status: 403, message: 'Sign in required' });
 
       const sub = await Subscription.findOne({
@@ -195,7 +199,45 @@ const createSeason = async (req, res, next) => {
   }
 };
 
-// --- 8. ADMIN: GET EPISODES (ALL STATUSES) ---
+// --- 8. ADMIN: UPDATE SEASON ---
+const updateSeason = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { title, number, description, status } = req.body;
+
+    const season = await Season.findByIdAndUpdate(
+      id,
+      { $set: { title, number, description, status } },
+      { new: true, runValidators: true }
+    );
+
+    if (!season) return next({ status: 404, message: 'Season not found' });
+
+    return sendSuccess(res, season);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// --- 9. ADMIN: DELETE SEASON ---
+const deleteSeason = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Check if season has episodes
+    const hasEpisodes = await Episode.exists({ season: id });
+    if (hasEpisodes) {
+      return next({ status: 400, message: 'Cannot delete season that has episodes. Move or delete episodes first.' });
+    }
+
+    await Season.findByIdAndDelete(id);
+    return sendSuccess(res, { message: 'Season deleted successfully' });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+// --- 10. ADMIN: GET EPISODES (ALL STATUSES) ---
 const getAdminEpisodes = async (req, res, next) => {
   try {
     const { seriesId } = req.params;
@@ -212,14 +254,15 @@ const getAdminEpisodes = async (req, res, next) => {
 const createEpisode = async (req, res, next) => {
   try {
     const { seriesId } = req.params;
-    // ✅ Map Frontend 'videoUrl' -> DB 'video', 'thumbnailUrl' -> 'thumbnail'
-    const { videoUrl, thumbnailUrl, ...rest } = req.body;
+    // ✅ Map Frontend 'videoUrl' -> DB 'video', 'thumbnailUrl' -> 'thumbnail', 'seasonId' -> 'season'
+    const { videoUrl, thumbnailUrl, seasonId, ...rest } = req.body;
 
     const episodeData = {
       ...rest,
       series: seriesId,
       video: videoUrl || rest.video,
-      thumbnail: thumbnailUrl || rest.thumbnail
+      thumbnail: thumbnailUrl || rest.thumbnail,
+      season: seasonId || null // Map seasonId to season
     };
 
     const episode = await Episode.create(episodeData);
@@ -233,12 +276,15 @@ const createEpisode = async (req, res, next) => {
 const updateEpisode = async (req, res, next) => {
   try {
     const { id } = req.params;
-    // ✅ Map Frontend 'videoUrl' -> DB 'video', 'thumbnailUrl' -> 'thumbnail'
-    const { videoUrl, thumbnailUrl, ...rest } = req.body;
+    // ✅ Map Frontend 'videoUrl' -> DB 'video', 'thumbnailUrl' -> 'thumbnail', 'seasonId' -> 'season'
+    const { videoUrl, thumbnailUrl, seasonId, ...rest } = req.body;
 
     const updateData = { ...rest };
     if (videoUrl) updateData.video = videoUrl;
     if (thumbnailUrl) updateData.thumbnail = thumbnailUrl;
+    if (seasonId !== undefined) updateData.season = seasonId || null; // Map seasonId to season
+    if (rest.duration !== undefined) updateData.duration = Number(rest.duration);
+    if (rest.isFree !== undefined) updateData.isFree = rest.isFree === true || rest.isFree === 'true';
 
     const updatedEpisode = await Episode.findByIdAndUpdate(
       id,
@@ -288,6 +334,8 @@ module.exports = {
   getAllSeries,
   getSeasons,
   createSeason,
+  updateSeason,
+  deleteSeason,
   getAdminEpisodes,
   createEpisode,
   updateEpisode,

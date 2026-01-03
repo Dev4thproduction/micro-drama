@@ -1,45 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Loader2 } from 'lucide-react';
-import { updateEpisode } from '@/lib/api'; // Make sure this path is correct
-import {Button} from '@/components/ui/Button'; // Adjust based on your UI components
-import {Input} from '@/components/ui/Input'; // Adjust based on your UI components
+import api from '@/lib/api';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 
 interface EditEpisodeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  episode: any; // You should replace 'any' with your Episode interface
+  episode: any;
 }
 
-const EditEpisodeModal: React.FC<EditEpisodeModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
-  episode 
+const EditEpisodeModal: React.FC<EditEpisodeModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  episode
 }) => {
   const [loading, setLoading] = useState(false);
+  const [seasons, setSeasons] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     thumbnailUrl: '',
     episodeNumber: '',
-    isFree: false
+    isFree: false,
+    seasonId: ''
   });
+
+  // Fetch seasons
+  useEffect(() => {
+    if (episode?.series) {
+      const seriesId = typeof episode.series === 'object' ? episode.series._id : episode.series;
+      api.get(`/admin/series/${seriesId}/seasons`).then(res => {
+        setSeasons(res.data.data);
+      });
+    }
+  }, [episode]);
 
   // Populate form when episode data changes
   useEffect(() => {
     if (episode) {
       setFormData({
         title: episode.title || '',
-        description: episode.description || '',
-        thumbnailUrl: episode.thumbnailUrl || '',
-        episodeNumber: episode.episodeNumber || '',
-        isFree: episode.isFree || false
+        description: episode.synopsis || episode.description || '',
+        thumbnailUrl: episode.thumbnailUrl || episode.thumbnail || '',
+        episodeNumber: episode.order?.toString() || episode.episodeNumber?.toString() || '',
+        isFree: episode.isFree || false,
+        seasonId: (typeof episode.season === 'object' ? episode.season?._id : episode.season) || ''
       });
     }
   }, [episode]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -54,7 +67,13 @@ const EditEpisodeModal: React.FC<EditEpisodeModalProps> = ({
 
     setLoading(true);
     try {
-      await updateEpisode(episode._id, formData);
+      const payload = {
+        ...formData,
+        synopsis: formData.description,
+        order: parseInt(formData.episodeNumber) || 1
+      };
+      await api.patch(`/admin/episodes/${episode._id}`, payload);
+
       onSuccess();
       onClose();
     } catch (error) {
@@ -78,6 +97,33 @@ const EditEpisodeModal: React.FC<EditEpisodeModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-400 mb-1">Season</label>
+              <select
+                name="seasonId"
+                value={formData.seasonId}
+                onChange={handleChange}
+                className="w-full rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-red-600"
+              >
+                <option value="">No Season</option>
+                {seasons.map(s => (
+                  <option key={s._id} value={s._id}>Season {s.number}: {s.title}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-400 mb-1">Episode Number</label>
+              <Input
+                type="number"
+                name="episodeNumber"
+                value={formData.episodeNumber}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-zinc-400 mb-1">Episode Title</label>
             <Input
@@ -89,29 +135,17 @@ const EditEpisodeModal: React.FC<EditEpisodeModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1">Episode Number</label>
-              <Input
-                type="number"
-                name="episodeNumber"
-                value={formData.episodeNumber}
-                onChange={handleChange}
-                required
+          <div className="flex items-center">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="isFree"
+                checked={formData.isFree}
+                onChange={handleCheckboxChange}
+                className="rounded border-zinc-700 bg-zinc-800 text-red-600 focus:ring-red-600"
               />
-            </div>
-            <div className="flex items-center pt-6">
-               <label className="flex items-center space-x-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  name="isFree"
-                  checked={formData.isFree}
-                  onChange={handleCheckboxChange}
-                  className="rounded border-zinc-700 bg-zinc-800 text-red-600 focus:ring-red-600"
-                />
-                <span className="text-sm text-zinc-300">Free Episode?</span>
-              </label>
-            </div>
+              <span className="text-sm text-zinc-300">Free Episode?</span>
+            </label>
           </div>
 
           <div>
@@ -137,7 +171,7 @@ const EditEpisodeModal: React.FC<EditEpisodeModalProps> = ({
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import api from '@/lib/api';
 import { X, Upload, Loader2, CheckCircle, Image as ImageIcon, Film } from 'lucide-react';
@@ -17,13 +17,27 @@ export default function AddEpisodeModal({ seriesId, onClose, onSuccess, nextOrde
   const [formData, setFormData] = useState({
     title: '',
     synopsis: '',
-    order: nextOrder.toString()
+    order: nextOrder.toString(),
+    isFree: false,
+    seasonId: ''
   });
+  const [seasons, setSeasons] = useState<any[]>([]);
+  const [duration, setDuration] = useState(0);
 
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [video, setVideo] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
+
+  // Fetch seasons
+  useEffect(() => {
+    api.get(`/admin/series/${seriesId}/seasons`).then(res => {
+      setSeasons(res.data.data);
+      if (res.data.data.length > 0) {
+        setFormData(prev => ({ ...prev, seasonId: res.data.data[0]._id }));
+      }
+    });
+  }, [seriesId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +50,8 @@ export default function AddEpisodeModal({ seriesId, onClose, onSuccess, nextOrde
       // 1. Upload Assets
       const videoRes = await uploadToCloudinary(video, 'video');
       const videoUrl = videoRes.url;
+      const videoDuration = Math.round(videoRes.duration || 0);
+
       let thumbnailUrl = '';
       if (thumbnail) {
         const thumbRes = await uploadToCloudinary(thumbnail, 'image');
@@ -47,8 +63,10 @@ export default function AddEpisodeModal({ seriesId, onClose, onSuccess, nextOrde
       await api.post(`/creator/series/${seriesId}/episodes`, {
         ...formData,
         order: parseInt(formData.order),
+        isFree: formData.isFree,
         video: videoUrl,
-        thumbnail: thumbnailUrl
+        thumbnail: thumbnailUrl,
+        duration: videoDuration
       });
 
       onSuccess();
@@ -79,6 +97,19 @@ export default function AddEpisodeModal({ seriesId, onClose, onSuccess, nextOrde
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-400 uppercase">Season</label>
+                <select
+                  required
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
+                  value={formData.seasonId}
+                  onChange={e => setFormData({ ...formData, seasonId: e.target.value })}
+                >
+                  {seasons.map(s => (
+                    <option key={s._id} value={s._id} className="bg-zinc-900">Season {s.number}: {s.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">Ep Number</label>
                 <input
                   type="number" required
@@ -86,7 +117,7 @@ export default function AddEpisodeModal({ seriesId, onClose, onSuccess, nextOrde
                   value={formData.order} onChange={e => setFormData({ ...formData, order: e.target.value })}
                 />
               </div>
-              <div className="md:col-span-2 space-y-2">
+              <div className="md:col-span-1 space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">Episode Title</label>
                 <input
                   type="text" required placeholder="e.g. The Beginning"
@@ -97,7 +128,27 @@ export default function AddEpisodeModal({ seriesId, onClose, onSuccess, nextOrde
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">Synopsis</label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-gray-400 uppercase">Synopsis</label>
+                <div className="flex items-center gap-2">
+                  <span className={clsx("text-[10px] font-bold uppercase", formData.isFree ? "text-emerald-400" : "text-amber-400")}>
+                    {formData.isFree ? 'Free Episode' : 'Premium Episode'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, isFree: !formData.isFree })}
+                    className={clsx(
+                      "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                      formData.isFree ? "bg-emerald-500" : "bg-gray-700"
+                    )}
+                  >
+                    <span className={clsx(
+                      "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                      formData.isFree ? "translate-x-4" : "translate-x-0"
+                    )} />
+                  </button>
+                </div>
+              </div>
               <textarea
                 rows={2} placeholder="What happens in this episode?"
                 className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
