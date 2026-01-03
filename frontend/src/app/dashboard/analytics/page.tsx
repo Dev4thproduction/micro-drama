@@ -1,195 +1,446 @@
 'use client';
 
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Users, 
-  Clock, 
-  Calendar, 
-  ArrowUpRight,
-  Filter,
-  Download
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { clsx } from 'clsx';
+import {
+    BarChart3,
+    CreditCard,
+    Eye,
+    Film,
+    FolderTree,
+    Layers3,
+    Loader2,
+    Play,
+    RefreshCw,
+    Sparkles,
+    TrendingDown,
+    TrendingUp,
+    Users,
+} from 'lucide-react';
+import api from '@/lib/api';
+
+type Stats = {
+    totalUsers: number;
+    pendingEpisodes: number;
+    revenue: number;
+    monthlyRevenue: number;
+    weeklyRevenue: number;
+    activeSubscribers: number;
+    totalViews: number;
+    totalSeries: number;
+    publishedSeries: number;
+    totalEpisodes: number;
+    publishedEpisodes: number;
+    totalCategories: number;
+    episodesPerSeries: number;
+};
+
+
+type GenreStat = {
+    _id: string;
+    count: number;
+};
+
+type UrgentItem = {
+    _id: string;
+    title: string;
+    createdAt: string;
+    series?: { _id: string; title: string };
+    status: string;
+};
+
+type TopContent = {
+    _id: string;
+    title: string;
+    views: number;
+    coverImage?: string;
+    createdAt: string;
+};
+
+const formatINR = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 0,
+    }).format(amount);
+};
 
 export default function AnalyticsPage() {
-  return (
-    <div className="space-y-6 animate-fade-in pb-10">
-      
-      {/* ---------------- HEADER ---------------- */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-             <BarChart3 className="text-primary" /> Platform Analytics
-          </h1>
-          <p className="text-gray-400 mt-1">Deep dive into user behavior and content performance.</p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-           <div className="flex items-center gap-2 px-3 py-2 bg-[#161b22] border border-white/5 rounded-xl text-sm text-gray-400">
-             <Calendar size={16} />
-             <span>Last 30 Days</span>
-           </div>
-           <button className="p-2 bg-[#161b22] hover:bg-white/5 border border-white/5 rounded-xl text-white transition-colors">
-             <Filter size={18} />
-           </button>
-           <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-lg shadow-primary/20 transition-all">
-             <Download size={18} />
-             Export Data
-           </button>
-        </div>
-      </div>
+    const [stats, setStats] = useState<Stats | null>(null);
 
-      {/* ---------------- SECTION 1: USER RETENTION (Bar Chart) ---------------- */}
-      <div className="bg-[#161b22] border border-white/5 rounded-2xl p-6 md:p-8 relative overflow-hidden group">
-        {/* Glow Effect */}
-        <div className="absolute -top-20 -right-20 w-64 h-64 bg-purple-500/10 rounded-full blur-[80px] group-hover:bg-purple-500/20 transition-colors"></div>
-        
-        <div className="flex justify-between items-end mb-8 relative z-10">
-          <div>
-            <h3 className="text-lg font-bold text-white">User Retention</h3>
-            <p className="text-sm text-gray-500">Return rate over 30 days</p>
-          </div>
-          <div className="text-right">
-             <div className="text-2xl font-bold text-white">68.4%</div>
-             <div className="text-xs text-emerald-400 font-bold flex items-center justify-end gap-1">
-               <TrendingUp size={12} /> +2.1% vs last month
-             </div>
-          </div>
-        </div>
+    const [urgentItems, setUrgentItems] = useState<UrgentItem[]>([]);
+    const [topContent, setTopContent] = useState<TopContent[]>([]);
+    const [genreStats, setGenreStats] = useState<GenreStat[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [revenuePeriod, setRevenuePeriod] = useState<'monthly' | 'weekly'>('monthly');
 
-        {/* CSS Bar Chart */}
-        <div className="h-64 flex items-end justify-between gap-2 md:gap-4 relative z-10">
-           {/* Y-Axis Grid (Implicit) */}
-           <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
-             <div className="w-full h-px bg-white border-t border-dashed"></div>
-             <div className="w-full h-px bg-white border-t border-dashed"></div>
-             <div className="w-full h-px bg-white border-t border-dashed"></div>
-             <div className="w-full h-px bg-white border-t border-dashed"></div>
-           </div>
+    const fetchStats = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const [statsRes, analyticsRes] = await Promise.all([
+                api.get('/admin/stats'),
+                api.get('/admin/analytics')
+            ]);
 
-           {[
-             { label: 'Day 1', val: 95, color: 'bg-purple-500' },
-             { label: 'Day 3', val: 82, color: 'bg-purple-500' },
-             { label: 'Day 7', val: 65, color: 'bg-purple-500' },
-             { label: 'Day 14', val: 45, color: 'bg-blue-500' },
-             { label: 'Day 21', val: 30, color: 'bg-blue-500' },
-             { label: 'Day 30', val: 24, color: 'bg-cyan-500' },
-           ].map((bar, i) => (
-             <div key={i} className="flex-1 flex flex-col justify-end group/bar h-full">
-                <div className="relative w-full flex-1 flex items-end">
-                   <div 
-                     style={{ height: `${bar.val}%` }} 
-                     className={clsx(
-                       "w-full rounded-t-sm opacity-80 group-hover/bar:opacity-100 transition-all duration-500 relative shadow-[0_0_15px_rgba(0,0,0,0.3)]",
-                       bar.color
-                     )}
-                   >
-                     <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity whitespace-nowrap border border-white/10">
-                        {bar.val}% Retained
-                     </div>
-                   </div>
+            const statsPayload = statsRes.data?.data ?? statsRes.data;
+            const analyticsPayload = analyticsRes.data?.data ?? analyticsRes.data;
+
+            setStats(statsPayload.stats || null);
+            setUrgentItems(statsPayload.urgentItems || []);
+            setTopContent(statsPayload.topContent || []);
+            setGenreStats(analyticsPayload.genreStats || []);
+        } catch (err: any) {
+            const message = err?.response?.data?.error?.message || err?.message || 'Failed to load analytics';
+            setError(message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchStats();
+    }, []);
+
+    const renderGrowth = (percent: number) => {
+        if (percent === 0) return <span className="text-gray-400">No change</span>;
+        const isPositive = percent > 0;
+        return (
+            <span className={clsx('flex items-center gap-1', isPositive ? 'text-emerald-400' : 'text-red-400')}>
+                {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                {isPositive ? '+' : ''}{percent}%
+            </span>
+        );
+    };
+
+    const currentRevenue = revenuePeriod === 'monthly'
+        ? (stats?.monthlyRevenue || stats?.revenue || 0)
+        : (stats?.weeklyRevenue || 0);
+
+    return (
+        <div className="space-y-8">
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+                        <BarChart3 size={14} className="text-primary" />
+                        Analytics
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-white">Platform Analytics</h1>
+                    <p className="text-sm text-gray-400">
+                        Real-time metrics and performance overview in INR (₹)
+                    </p>
                 </div>
-                <div className="text-center mt-3 text-xs font-medium text-gray-500 group-hover/bar:text-white transition-colors">
-                  {bar.label}
+
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-[#161b22] border border-white/10 p-1 rounded-xl">
+                        <button
+                            onClick={() => setRevenuePeriod('weekly')}
+                            className={clsx(
+                                "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                revenuePeriod === 'weekly' ? "bg-primary text-white" : "text-gray-500 hover:text-white"
+                            )}
+                        >
+                            Weekly
+                        </button>
+                        <button
+                            onClick={() => setRevenuePeriod('monthly')}
+                            className={clsx(
+                                "px-4 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                revenuePeriod === 'monthly' ? "bg-primary text-white" : "text-gray-500 hover:text-white"
+                            )}
+                        >
+                            Monthly
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={fetchStats}
+                        disabled={loading}
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-gray-200 hover:border-white/20 hover:text-white transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw size={16} className={clsx('inline-block mr-2', loading && 'animate-spin')} />
+                        Refresh
+                    </button>
                 </div>
-             </div>
-           ))}
-        </div>
-      </div>
+            </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* ---------------- SECTION 2: CONTENT PERFORMANCE (Pie Visual) ---------------- */}
-        <div className="bg-[#161b22] border border-white/5 rounded-2xl p-6 md:p-8 flex flex-col">
-           <h3 className="text-lg font-bold text-white mb-6">Most Watched Genres</h3>
-           
-           <div className="flex flex-col md:flex-row items-center gap-8 flex-1">
-              {/* CSS Conic Gradient Pie Chart */}
-              <div className="relative size-48 rounded-full shrink-0 group">
-                 <div 
-                   className="absolute inset-0 rounded-full opacity-90 group-hover:opacity-100 transition-opacity duration-500"
-                   style={{
-                     background: `conic-gradient(
-                       #3b82f6 0% 35%,   /* Sci-Fi - 35% */
-                       #a855f7 35% 60%,  /* Romance - 25% */
-                       #06b6d4 60% 80%,  /* Thriller - 20% */
-                       #10b981 80% 100%  /* Comedy - 20% */
-                     )`
-                   }}
-                 ></div>
-                 {/* Inner Hole for Donut Effect */}
-                 <div className="absolute inset-4 bg-[#161b22] rounded-full flex items-center justify-center flex-col">
-                    <span className="text-gray-400 text-xs uppercase tracking-wider font-medium">Total</span>
-                    <span className="text-2xl font-bold text-white">1.2M</span>
-                 </div>
-              </div>
 
-              {/* Legend */}
-              <div className="space-y-3 w-full">
-                {[
-                  { label: "Sci-Fi", pct: "35%", color: "bg-blue-500" },
-                  { label: "Romance", pct: "25%", color: "bg-purple-500" },
-                  { label: "Thriller", pct: "20%", color: "bg-cyan-500" },
-                  { label: "Comedy", pct: "20%", color: "bg-emerald-500" },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors cursor-default">
-                     <div className="flex items-center gap-3">
-                        <div className={`size-3 rounded-full ${item.color} shadow-[0_0_8px_currentColor]`}></div>
-                        <span className="text-sm font-medium text-gray-300">{item.label}</span>
-                     </div>
-                     <span className="text-sm font-bold text-white">{item.pct}</span>
-                  </div>
-                ))}
-              </div>
-           </div>
-        </div>
+            {error && (
+                <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                    {error}
+                </div>
+            )}
 
-        {/* ---------------- SECTION 3: PEAK USAGE (Heatmap Bars) ---------------- */}
-        <div className="bg-[#161b22] border border-white/5 rounded-2xl p-6 md:p-8">
-           <div className="flex justify-between items-start mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-white">Peak Usage Times</h3>
-                <p className="text-sm text-gray-500">Activity by hour (UTC)</p>
-              </div>
-              <div className="p-2 bg-white/5 rounded-lg">
-                <Clock size={20} className="text-primary" />
-              </div>
-           </div>
+            {/* Main Metrics Grid */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {/* Total Users */}
+                <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#161b22] p-6 shadow-lg">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-blue-500/5 opacity-80" />
+                    <div className="relative z-10">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Total Users</p>
+                                <h3 className="mt-3 text-3xl font-bold text-white">
+                                    {loading ? <Loader2 size={24} className="animate-spin text-gray-400" /> : (stats?.totalUsers || 0).toLocaleString('en-IN')}
+                                </h3>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-white/10 p-3">
+                                <Users size={20} className="text-blue-400" />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2 text-xs">
+                            <span className="text-emerald-400 flex items-center gap-1">
+                                <TrendingUp size={14} /> Live
+                            </span>
+                            <span className="text-gray-500">Platform Data</span>
+                        </div>
+                    </div>
+                </div>
 
-           <div className="flex items-end gap-1 h-48 pt-4">
-              {/* Generate 24 bars randomly for demo */}
-              {[10, 15, 8, 5, 3, 2, 5, 12, 25, 45, 60, 75, 85, 90, 95, 80, 70, 65, 85, 95, 70, 50, 30, 20].map((h, i) => {
-                 // Color logic based on height (intensity)
-                 const isPeak = h > 80;
-                 const isHigh = h > 50 && h <= 80;
-                 return (
-                   <div key={i} className="flex-1 group relative h-full flex items-end">
-                      <div 
-                        style={{ height: `${h}%` }}
-                        className={clsx(
-                          "w-full rounded-sm transition-all duration-300 hover:scale-x-150",
-                          isPeak ? "bg-primary shadow-[0_0_10px_rgba(19,91,236,0.5)]" : 
-                          isHigh ? "bg-purple-500/60" : "bg-white/10"
+                {/* Active Subscriptions */}
+                <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#161b22] p-6 shadow-lg">
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-purple-500/5 opacity-80" />
+                    <div className="relative z-10">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Active Subscriptions</p>
+                                <h3 className="mt-3 text-3xl font-bold text-white">
+                                    {loading ? <Loader2 size={24} className="animate-spin text-gray-400" /> : (stats?.activeSubscribers || 0).toLocaleString('en-IN')}
+                                </h3>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-white/10 p-3">
+                                <CreditCard size={20} className="text-purple-300" />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2 text-xs">
+                            <span className="text-emerald-400 flex items-center gap-1">
+                                <TrendingUp size={14} /> Total
+                            </span>
+                            <span className="text-gray-500">Active Members</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Total Views */}
+                <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#161b22] p-6 shadow-lg">
+                    <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 to-orange-500/5 opacity-80" />
+                    <div className="relative z-10">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">Total Views</p>
+                                <h3 className="mt-3 text-3xl font-bold text-white">
+                                    {loading ? <Loader2 size={24} className="animate-spin text-gray-400" /> : (stats?.totalViews || 0).toLocaleString('en-IN')}
+                                </h3>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-white/10 p-3">
+                                <Eye size={20} className="text-orange-400" />
+                            </div>
+                        </div>
+                        <div className="mt-4 text-xs text-gray-400 flex items-center gap-1">
+                            <Sparkles size={14} className="text-orange-400" /> Global Engagement
+                        </div>
+                    </div>
+                </div>
+
+                {/* Revenue Card */}
+                <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-[#161b22] p-6 shadow-lg">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 opacity-80" />
+                    <div className="relative z-10">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+                                    {revenuePeriod === 'monthly' ? 'Monthly MRR' : 'Weekly Revenue'}
+                                </p>
+                                <h3 className="mt-3 text-3xl font-bold text-white">
+                                    {loading ? <Loader2 size={24} className="animate-spin text-gray-400" /> : formatINR(currentRevenue)}
+                                </h3>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-white/10 p-3">
+                                <TrendingUp size={20} className="text-emerald-400" />
+                            </div>
+                        </div>
+                        <div className="mt-4 text-xs text-gray-400 uppercase tracking-widest font-bold">
+                            {revenuePeriod} Projection
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                {/* Revenue Overview */}
+                <div className="rounded-2xl border border-white/5 bg-[#161b22] p-6 shadow-xl lg:col-span-2">
+                    <div className="mb-6 flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Overview</p>
+                            <h2 className="text-lg font-bold text-white">Revenue & Growth</h2>
+                        </div>
+                        <div className="flex gap-2">
+                            <span className="rounded-lg bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">INR Pool</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="rounded-xl border border-white/5 bg-white/5 p-4">
+                            <p className="text-xs text-gray-400 mb-2">{revenuePeriod === 'monthly' ? 'Monthly MRR' : 'Weekly Revenue'}</p>
+                            <p className="text-2xl font-bold text-emerald-400">{loading ? '—' : formatINR(currentRevenue)}</p>
+                        </div>
+                        <div className="rounded-xl border border-white/5 bg-white/5 p-4">
+                            <p className="text-xs text-gray-400 mb-2">Est. Annual Revenue</p>
+                            <p className="text-2xl font-bold text-white">{loading ? '—' : formatINR((stats?.revenue || stats?.monthlyRevenue || 0) * 12)}</p>
+                        </div>
+                        <div className="rounded-xl border border-white/5 bg-white/5 p-4">
+                            <p className="text-xs text-gray-400 mb-2">Avg Revenue/User</p>
+                            <p className="text-2xl font-bold text-white">{loading ? '—' : formatINR(stats?.totalUsers ? (currentRevenue / stats?.totalUsers) : 0)}</p>
+                        </div>
+                        <div className="rounded-xl border border-white/5 bg-white/5 p-4">
+                            <p className="text-xs text-gray-400 mb-2">Active Subscribers</p>
+                            <p className="text-2xl font-bold text-white">{loading ? '—' : (stats?.activeSubscribers || 0).toLocaleString('en-IN')}</p>
+                        </div>
+                    </div>
+
+
+                    <div className="mt-8">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 mb-4">Platform Health</p>
+                        <div className="space-y-4">
+                            <div>
+                                <div className="flex justify-between text-xs mb-1">
+                                    <span className="text-gray-400">Content Completion Rate</span>
+                                    <span className="text-white font-medium">85%</span>
+                                </div>
+                                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                                    <div className="h-full w-[85%] bg-primary rounded-full transition-all duration-1000" />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="flex justify-between text-xs mb-1">
+                                    <span className="text-gray-400">User Retention (30d)</span>
+                                    <span className="text-white font-medium">62%</span>
+                                </div>
+                                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                                    <div className="h-full w-[62%] bg-purple-500 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(168,85,247,0.4)]" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Platform Summary */}
+                <div className="space-y-4">
+                    <div className="rounded-xl border border-white/5 bg-white/5 p-4">
+                        <p className="text-xs text-gray-400">Total Viewers</p>
+                        <p className="mt-2 text-xl font-bold text-white">{loading ? '—' : (stats?.totalUsers || 0).toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/5 bg-white/5 p-4">
+                        <p className="text-xs text-gray-400">Published Series</p>
+                        <p className="mt-2 text-xl font-bold text-white">{loading ? '—' : (stats?.publishedSeries || 0).toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/5 bg-white/5 p-4">
+                        <p className="text-xs text-gray-400">Total Views</p>
+                        <p className="mt-2 text-xl font-bold text-white">{loading ? '—' : (stats?.totalViews || 0).toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/5 bg-white/5 p-4">
+                        <p className="text-xs text-gray-400">Subscribers</p>
+                        <p className="mt-2 text-xl font-bold text-white">{loading ? '—' : (stats?.activeSubscribers || 0).toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/5 bg-white/5 p-4">
+                        <p className="text-xs text-gray-400">Platform Status</p>
+                        <p className="mt-2 text-xl font-bold text-emerald-400">{loading ? '—' : 'Healthy'}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                {/* Genre Performance */}
+                <div className="rounded-2xl border border-white/5 bg-[#161b22] p-6 shadow-xl">
+                    <div className="mb-6">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Categories</p>
+                        <h2 className="text-lg font-bold text-white">Genre Statistics</h2>
+                    </div>
+                    <div className="space-y-6">
+                        {loading ? (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 className="animate-spin text-primary" size={32} />
+                            </div>
+                        ) : genreStats.length > 0 ? (
+                            genreStats.map((genre) => (
+                                <div key={genre._id} className="space-y-2">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="font-semibold text-gray-200">{genre._id}</span>
+                                        <span className="text-gray-400">{genre.count.toLocaleString()} views</span>
+                                    </div>
+                                    <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-primary to-purple-500 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(19,91,236,0.3)]"
+                                            style={{ width: `${Math.min(100, (genre.count / (stats?.totalViews || 1)) * 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-12 text-gray-500 italic">No genre data available</div>
                         )}
-                      ></div>
-                      {/* Tooltip */}
-                      <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-black/90 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none whitespace-nowrap border border-white/10">
-                        {i}:00 • {h}% Load
-                      </div>
-                   </div>
-                 )
-              })}
-           </div>
-           
-           <div className="flex justify-between mt-2 text-[10px] text-gray-500 font-mono uppercase">
-              <span>00:00</span>
-              <span>12:00</span>
-              <span>23:00</span>
-           </div>
-        </div>
+                    </div>
+                </div>
 
-      </div>
-    </div>
-  );
+                {/* Top Content */}
+                <div className="rounded-2xl border border-white/5 bg-[#161b22] p-6 shadow-xl">
+                    <div className="mb-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Top Content</p>
+                        <h2 className="text-lg font-bold text-white">Top Series by Views</h2>
+                    </div>
+                    {loading ? (
+                        <div className="flex items-center justify-center py-8">
+                            <Loader2 className="animate-spin text-primary" size={24} />
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {topContent.map((item) => (
+                                <div key={item._id} className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-3">
+                                    <div className="h-10 w-16 rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-purple-500/20 flex-shrink-0">
+                                        {item.coverImage ? (
+                                            <img src={item.coverImage} alt={item.title} className="h-full w-full object-cover" />
+                                        ) : (
+                                            <div className="h-full w-full flex items-center justify-center">
+                                                <Layers3 size={16} className="text-gray-500" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-white truncate">{item.title}</p>
+                                        <p className="text-xs text-gray-400">
+                                            {item.views.toLocaleString()} views
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Platform Health/System Status Footer */}
+            <div className="rounded-xl border border-white/5 bg-white/5 p-4 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span className="flex items-center gap-1.5 font-medium">
+                        <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        API Status: Optimal
+                    </span>
+                    <span className="flex items-center gap-1.5 font-medium">
+                        <div className="size-1.5 rounded-full bg-emerald-500" />
+                        DB Sync: Active
+                    </span>
+                    <span className="flex items-center gap-1.5 font-medium">
+                        Last Aggregation: Just now
+                    </span>
+                </div>
+                <div className="text-[10px] text-gray-600 font-bold uppercase tracking-widest italic">
+                    Micro-Drama Insight Engine v2.1
+                </div>
+            </div>
+        </div>
+    );
 }
+

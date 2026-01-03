@@ -64,8 +64,33 @@ export const removeFromMyList = async (seriesId: string) => {
   return response.data;
 };
 
+export const getProfile = async () => {
+  const response = await api.get('/users/profile');
+  return response.data;
+};
+
+export const updateProfile = async (data: { displayName?: string, currentPassword?: string, newPassword?: string }) => {
+  const response = await api.patch('/auth/profile', data);
+  return response.data;
+};
+
+export const getWatchHistory = async () => {
+  const response = await api.get('/users/history');
+  return response.data;
+};
+
+export const addToWatchHistory = async (data: { episodeId: string, progressSeconds: number, completed: boolean }) => {
+  const response = await api.post('/users/history', data);
+  return response.data;
+};
+
 export const checkMyListStatus = async (seriesId: string) => {
   const response = await api.get(`/users/mylist/check/${seriesId}`);
+  return response.data;
+};
+
+export const incrementView = async (data: { seriesId?: string, episodeId?: string }) => {
+  const response = await api.post('/analytics/view', data);
   return response.data;
 };
 

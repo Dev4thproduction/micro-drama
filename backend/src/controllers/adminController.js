@@ -10,39 +10,84 @@ const { parsePagination, buildMeta } = require('../utils/pagination');
 // --- 1. DASHBOARD OVERVIEW ---
 const getDashboardStats = async (req, res, next) => {
   try {
-    // 1. Fetch Key Counts (No Creator Stats)
-    const [totalUsers, pendingEpisodes, subscriptions] = await Promise.all([
-      User.countDocuments({ role: 'viewer' }), 
+    // 1. Fetch Key Counts
+    const [
+      totalUsers,
+      pendingEpisodes,
+      subscriptions,
+      viewStats,
+      totalSeries,
+      publishedSeries,
+      totalEpisodes,
+      totalCategories
+    ] = await Promise.all([
+      User.countDocuments({ role: 'viewer' }),
       Episode.countDocuments({ status: 'pending' }),
-      Subscription.find({ status: 'active' })
+      Subscription.find({ status: 'active' }),
+      Series.aggregate([{ $group: { _id: null, totalViews: { $sum: "$views" } } }]),
+      Series.countDocuments(),
+      Series.countDocuments({ status: 'published' }),
+      Episode.countDocuments(),
+      require('../models/Category').countDocuments()
     ]);
 
+    const totalViews = viewStats.length > 0 ? viewStats[0].totalViews : 0;
+
     // 2. Calculate Revenue (In Rupees)
-    // Assumptions: Weekly = ₹99, Monthly = ₹199
-    // We calculate "Monthly Recurring Revenue" (MRR)
-    let revenue = 0;
+    let monthlyRevenue = 0;
+    let weeklyRevenue = 0;
     subscriptions.forEach(sub => {
-        if (sub.plan === 'weekly') {
-            revenue += (99 * 4); // ₹99/week * 4 weeks = ₹396/month contribution
-        } else {
-            revenue += 199;      // ₹199/month
-        }
+      if (sub.plan === 'weekly') {
+        monthlyRevenue += 396; // 99 * 4
+        weeklyRevenue += 99;
+      } else {
+        monthlyRevenue += 199;
+        weeklyRevenue += 50; // 199 / 4 ≈ 50
+      }
     });
+
+    const revenue = monthlyRevenue; // Default to monthly for backward compatibility
+
+
+    // 2.1 Calculate Lifetime Revenue
+    const allSubs = await Subscription.find();
+    const totalRevenue = allSubs.reduce((acc, sub) => {
+      const subAmount = sub.amount || (sub.plan === 'weekly' ? 99 : 199);
+      return acc + subAmount;
+    }, 0);
 
     // 3. Urgent Items (Pending Episodes)
     const urgentItems = await Episode.find({ status: 'pending' })
-      .populate('series', 'title') 
+      .populate('series', 'title')
       .sort({ createdAt: -1 })
       .limit(5);
 
+    // 4. Top Performing Content (by views)
+    const topContent = await Series.find({ status: 'published' })
+      .sort({ views: -1 })
+      .limit(5)
+      .select('title views coverImage createdAt');
+
     return sendSuccess(res, {
-      stats: { 
-        totalUsers, 
-        pendingEpisodes, 
-        revenue,             // Returns value in Rupees (e.g., 5000)
-        activeSubscribers: subscriptions.length 
+      stats: {
+        totalUsers,
+        pendingEpisodes,
+        revenue,
+        monthlyRevenue,
+        weeklyRevenue,
+        totalRevenue,
+        activeSubscribers: subscriptions.length,
+
+        totalViews,
+        totalSeries,
+        publishedSeries,
+        totalEpisodes,
+        publishedEpisodes: totalEpisodes - pendingEpisodes, // Estimation
+        totalCategories,
+        episodesPerSeries: totalSeries > 0 ? (totalEpisodes / totalSeries).toFixed(1) : 0
       },
-      urgentItems
+      urgentItems,
+      topContent
     });
   } catch (err) {
     return next(err);
@@ -66,13 +111,13 @@ const getUsers = async (req, res, next) => {
         { displayName: { $regex: search, $options: 'i' } }
       ];
     }
-    
+
     // Filter by Role (Only Admin or Viewer)
     if (role && role !== 'all') {
-        filter.role = role;
+      filter.role = role;
     } else {
-        // By default, do not show 'creator' if they exist in DB, unless explicitly asked
-        filter.role = { $in: ['admin', 'viewer'] }; 
+      // By default, do not show 'creator' if they exist in DB, unless explicitly asked
+      filter.role = { $in: ['admin', 'viewer'] };
     }
 
     if (status && status !== 'all') filter.status = status;
@@ -94,7 +139,7 @@ const updateUserStatus = async (req, res, next) => {
     const { status } = req.body;
 
     if (!['active', 'suspended', 'banned'].includes(status)) {
-       return next({ status: 400, message: 'Invalid status' });
+      return next({ status: 400, message: 'Invalid status' });
     }
 
     const user = await User.findByIdAndUpdate(userId, { status }, { new: true });
@@ -181,7 +226,7 @@ const toggleSubscription = async (req, res, next) => {
     if (!user) return next({ status: 404, message: 'User not found' });
 
     let subscription = await Subscription.findOne({ user: userId });
-    
+
     // Default to 'monthly' (₹199) if creating new
     if (!subscription) {
       subscription = new Subscription({ user: userId, plan: 'monthly', status: 'trial' });
@@ -203,14 +248,19 @@ const toggleSubscription = async (req, res, next) => {
 
 const getSubscribers = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, search } = req.query;
+    const { page = 1, limit = 10, search, plan } = req.query;
     const skip = (page - 1) * limit;
 
     const query = { status: { $in: ['active', 'canceled', 'trial'] } };
-    
+
+    if (plan && ['monthly', 'weekly'].includes(plan)) {
+      query.plan = plan;
+    }
+
     if (search) {
-      const users = await User.find({ 
-        $or: [{ email: { $regex: search, $options: 'i' } }, { displayName: { $regex: search, $options: 'i' } }] 
+
+      const users = await User.find({
+        $or: [{ email: { $regex: search, $options: 'i' } }, { displayName: { $regex: search, $options: 'i' } }]
       }).select('_id');
       query.user = { $in: users.map(u => u._id) };
     }
@@ -233,12 +283,18 @@ const getSubscribers = async (req, res, next) => {
 // --- 5. ANALYTICS ---
 const getAnalytics = async (req, res, next) => {
   try {
-    const genreStats = [
-       { _id: 'Sci-Fi', count: 450 },
-       { _id: 'Romance', count: 320 },
-       { _id: 'Thriller', count: 210 }
-    ];
-    return sendSuccess(res, { genreStats });
+    const genreStats = await Series.aggregate([
+      { $group: { _id: "$category", count: { $sum: "$views" } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Convert _id to genre names
+    const stats = genreStats.map(item => ({
+      _id: item._id || 'Uncategorized',
+      count: item.count
+    }));
+
+    return sendSuccess(res, { genreStats: stats });
   } catch (err) {
     return next(err);
   }
@@ -271,6 +327,43 @@ const createAdmin = async (req, res, next) => {
   }
 };
 
+const updateUser = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { displayName, email, role } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return next({ status: 404, message: 'User not found' });
+
+    if (displayName) user.displayName = displayName;
+    if (email) user.email = email;
+    if (role) {
+      if (!['admin', 'viewer', 'creator'].includes(role)) {
+        return next({ status: 400, message: 'Invalid role' });
+      }
+      user.role = role;
+    }
+
+    await user.save();
+    return sendSuccess(res, user);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const deleteUser = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findByIdAndDelete(userId);
+    if (!user) return next({ status: 404, message: 'User not found' });
+
+    return sendSuccess(res, { message: 'User deleted successfully' });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getUsers,
@@ -282,5 +375,7 @@ module.exports = {
   toggleSubscription,
   getSubscribers,
   getAnalytics,
-  createAdmin
+  createAdmin,
+  updateUser,
+  deleteUser
 };

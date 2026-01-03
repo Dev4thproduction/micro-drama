@@ -2,15 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Users, 
-  CreditCard, 
-  Film, 
-  UserPlus, 
+import {
+  LayoutDashboard,
+  Users,
+  CreditCard,
+  Film,
+  UserPlus,
   LogOut,
   Menu,
-  X
+  X,
+  BarChart3
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
@@ -23,6 +24,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
     { name: 'Users', href: '/dashboard/users', icon: Users },
     { name: 'Subscriptions', href: '/dashboard/subscriptions', icon: CreditCard },
     { name: 'Content CMS', href: '/dashboard/cms/series', icon: Film },
@@ -33,9 +35,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-[#0f1117] text-white font-display flex">
-      
+
       {/* Mobile Menu Button */}
-      <button 
+      <button
         className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-white/10 rounded-lg"
         onClick={() => setIsMobileOpen(!isMobileOpen)}
       >
@@ -66,8 +68,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   onClick={() => setIsMobileOpen(false)}
                   className={clsx(
                     "flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition-all",
-                    isActive 
-                      ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                    isActive
+                      ? "bg-primary text-white shadow-lg shadow-primary/20"
                       : "text-gray-400 hover:bg-white/5 hover:text-white"
                   )}
                 >
@@ -89,7 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <p className="text-xs text-gray-500 truncate">{user?.email}</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={logout}
               className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-400 rounded-xl hover:bg-red-500/10 transition-colors"
             >
@@ -109,7 +111,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Mobile Overlay */}
       {isMobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden"
           onClick={() => setIsMobileOpen(false)}
         />

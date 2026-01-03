@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Search, Zap, Crown, LogOut, LayoutDashboard, Settings, CreditCard } from 'lucide-react';
+import { Search, Zap, Crown, LogOut, LayoutDashboard, Settings, CreditCard, User as UserIcon } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
 
@@ -92,7 +92,7 @@ export default function Navbar() {
                       </Link>
                     )}
                     {user.role === 'admin' && <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-300 hover:bg-primary hover:text-white rounded-lg transition-colors"><LayoutDashboard size={16} /> Dashboard</Link>}
-                    <Link href="/settings" className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-300 hover:bg-primary hover:text-white rounded-lg transition-colors"><Settings size={16} /> Settings</Link>
+                    <Link href="/profile" className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-300 hover:bg-primary hover:text-white rounded-lg transition-colors"><UserIcon size={16} /> Profile</Link>
                     <div className="h-px bg-white/5 my-1" />
                     <button onClick={logout} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition-colors"><LogOut size={16} /> Sign Out</button>
                   </div>

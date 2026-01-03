@@ -166,7 +166,6 @@ export default function SubscriptionPage() {
               {loading === 'monthly' ? 'Processing...' : 'Subscribe Monthly'}
             </button>
           </div>
-z
         </div>
 
         <div className="mt-16 text-center">

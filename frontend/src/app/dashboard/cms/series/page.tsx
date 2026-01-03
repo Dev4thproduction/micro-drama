@@ -119,9 +119,6 @@ export default function CMSSeriesPage() {
                 <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[#161b22] via-[#161b22]/90 to-transparent pt-12">
                   <h3 className="font-bold text-white truncate text-lg leading-tight group-hover:text-primary transition-colors">{item.title}</h3>
                   <div className="flex items-center gap-3 mt-3 text-xs text-gray-400">
-                    <span className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded">
-                      <Star size={10} className="text-yellow-500" /> 4.8
-                    </span>
                     <span className="bg-white/10 px-2 py-0.5 rounded text-gray-300">
                       {item.category || 'Series'}
                     </span>

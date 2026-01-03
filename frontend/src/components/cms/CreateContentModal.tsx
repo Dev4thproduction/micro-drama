@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default function CreateContentModal({ type, onClose, onSuccess }: Props) {
-  const [categories, setCategories] = useState<{_id: string, name: string}[]>([]);
+  const [categories, setCategories] = useState<{ _id: string, name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
 
@@ -37,7 +37,7 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     if (!thumbnail) return alert('Series/Movie Cover Image is required');
     if (type === 'movie' && !epVideo) return alert('Movie Video File is required');
@@ -50,18 +50,20 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
       // 1. UPLOAD SERIES/MOVIE COVER
       // ---------------------------------------------------------
       setStatus('Uploading Cover Image...');
-      const coverImageUrl = await uploadToCloudinary(thumbnail, 'image');
+      const coverRes = await uploadToCloudinary(thumbnail, 'image');
+      const coverImageUrl = coverRes.url;
 
       // ---------------------------------------------------------
       // 2. CREATE SERIES / MOVIE CONTAINER
       // ---------------------------------------------------------
       setStatus(type === 'series' ? 'Creating Series Container...' : 'Finalizing Movie...');
-      
+
       // If it's a movie, we upload video now. If series, we wait.
       let movieVideoUrl = '';
       if (type === 'movie' && epVideo) {
         setStatus('Uploading Movie Video (Large file)...');
-        movieVideoUrl = await uploadToCloudinary(epVideo, 'video');
+        const videoRes = await uploadToCloudinary(epVideo, 'video');
+        movieVideoUrl = videoRes.url;
       }
 
       const createRes = await api.post('/creator/series', {
@@ -78,12 +80,14 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
       // ---------------------------------------------------------
       if (type === 'series' && epVideo) {
         setStatus('Uploading Episode Video...');
-        const episodeVideoUrl = await uploadToCloudinary(epVideo, 'video');
-        
+        const videoRes = await uploadToCloudinary(epVideo, 'video');
+        const episodeVideoUrl = videoRes.url;
+
         let episodeThumbUrl = '';
         if (epThumbnail) {
           setStatus('Uploading Episode Thumbnail...');
-          episodeThumbUrl = await uploadToCloudinary(epThumbnail, 'image');
+          const thumbRes = await uploadToCloudinary(epThumbnail, 'image');
+          episodeThumbUrl = thumbRes.url;
         }
 
         setStatus('Linking First Episode...');
@@ -100,9 +104,10 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
       setStatus('Success!');
       onSuccess();
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to create content. Check console for details.');
+      const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Unknown error';
+      alert(`Failed to create content: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -111,7 +116,7 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
       <div className="bg-[#161b22] border border-white/10 w-full max-w-4xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
-        
+
         {/* --- HEADER --- */}
         <div className="flex justify-between items-center p-6 border-b border-white/5 bg-[#0f1117]">
           <div className="flex items-center gap-3">
@@ -133,29 +138,29 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
         {/* --- BODY --- */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
           <form onSubmit={handleSubmit} className="space-y-10">
-            
+
             {/* SECTION 1: MAIN INFO */}
             <div className="space-y-6">
               <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-white/10 text-white flex items-center justify-center text-xs">1</span>
                 {type === 'series' ? 'Series Info' : 'Movie Details'}
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-5">
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-300 ml-1">Title</label>
-                    <input 
+                    <input
                       required type="text" placeholder={type === 'series' ? "Series Name" : "Movie Title"}
                       className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-primary focus:ring-1 focus:ring-primary/50 outline-none transition-all"
-                      value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})}
+                      value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-300 ml-1">Category</label>
-                    <select 
+                    <select
                       className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-primary outline-none appearance-none cursor-pointer hover:bg-black/60"
-                      value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}
+                      value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}
                     >
                       <option value="" disabled>Select Category</option>
                       {categories.map(c => <option key={c._id} value={c.name} className="bg-gray-900">{c.name}</option>)}
@@ -163,10 +168,10 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-300 ml-1">Synopsis</label>
-                    <textarea 
+                    <textarea
                       rows={3} placeholder="What is this story about?"
                       className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none resize-none"
-                      value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
+                      value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })}
                     />
                   </div>
                 </div>
@@ -211,7 +216,7 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
 
               <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  
+
                   {/* Left: Input Fields (Only for Series) */}
                   {type === 'series' && (
                     <div className="space-y-5">
@@ -219,23 +224,23 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
                         {/* ✅ Episode Number Field */}
                         <div className="w-1/3 space-y-2">
                           <label className="text-xs font-semibold text-gray-300 ml-1">Ep No.</label>
-                          <input 
+                          <input
                             type="number" min="1"
                             className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none text-center font-bold"
-                            value={epData.order} onChange={e => setEpData({...epData, order: e.target.value})}
+                            value={epData.order} onChange={e => setEpData({ ...epData, order: e.target.value })}
                           />
                         </div>
                         {/* Episode Title Field */}
                         <div className="flex-1 space-y-2">
                           <label className="text-xs font-semibold text-gray-300 ml-1">Episode Title</label>
-                          <input 
+                          <input
                             type="text" placeholder="e.g., The Beginning"
                             className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
-                            value={epData.title} onChange={e => setEpData({...epData, title: e.target.value})}
+                            value={epData.title} onChange={e => setEpData({ ...epData, title: e.target.value })}
                           />
                         </div>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <label className="text-xs font-semibold text-gray-300 ml-1">Ep Thumbnail (Optional)</label>
                         <div className="flex items-center gap-4">
@@ -288,7 +293,7 @@ export default function CreateContentModal({ type, onClose, onSuccess }: Props) 
           <button onClick={onClose} className="px-6 py-3 rounded-xl text-sm font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
             Cancel
           </button>
-          <button 
+          <button
             onClick={handleSubmit}
             disabled={loading}
             className="px-8 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100 flex items-center gap-2"

@@ -17,7 +17,7 @@ const createSeries = async (req, res, next) => {
     const content = await Series.create({
       title,
       description,
-      category, 
+      category,
       tags: category ? [category] : [],
       coverImage,
       videoUrl: type === 'movie' ? videoUrl : undefined,
@@ -28,7 +28,8 @@ const createSeries = async (req, res, next) => {
 
     return sendSuccess(res, content);
   } catch (err) {
-    return next(err);
+    console.error("CREATE SERIES ERROR:", err);
+    return next({ status: 500, message: `DB Error: ${err.message}` });
   }
 };
 
@@ -37,25 +38,31 @@ const listContent = async (req, res, next) => {
     const { type } = req.query;
     const creatorId = new Types.ObjectId(req.user.id);
     const matchStage = { creator: creatorId };
-    
+
     if (type) matchStage.type = type;
 
     // Aggregate to get content + episode count
     const content = await Series.aggregate([
       { $match: matchStage },
-      { $lookup: {
+      {
+        $lookup: {
           from: 'episodes',
           localField: '_id',
           foreignField: 'series',
           as: 'episodes'
-      }},
-      { $addFields: {
+        }
+      },
+      {
+        $addFields: {
           episodeCount: { $size: '$episodes' }
-      }},
-      { $project: {
+        }
+      },
+      {
+        $project: {
           episodes: 0, // Don't send full episode list here for performance
           __v: 0
-      }},
+        }
+      },
       { $sort: { createdAt: -1 } }
     ]);
 
@@ -79,7 +86,7 @@ const createEpisode = async (req, res, next) => {
     if (!Types.ObjectId.isValid(seriesId)) return next({ status: 400, message: 'Invalid seriesId' });
     if (!title) return next({ status: 400, message: 'Title is required' });
     if (!video) return next({ status: 400, message: 'Video URL is required' });
-    
+
     // Check Series Exists & Ownership
     const series = await Series.findById(seriesId);
     if (!series) return next({ status: 404, message: 'Series not found' });
@@ -136,7 +143,7 @@ const createCategory = async (req, res, next) => {
   try {
     const { name } = req.body;
     if (!name) return next({ status: 400, message: 'Category name is required' });
-    
+
     // Check duplicates
     const exists = await Category.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
     if (exists) return next({ status: 400, message: 'Category already exists' });

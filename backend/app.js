@@ -13,6 +13,7 @@ const userRoutes = require('./src/routes/user.routes');
 const errorHandler = require('./src/middleware/errorHandler');
 const requestLogger = require('./src/middleware/requestLogger');
 const browseRoutes = require('./src/routes/browse.routes');
+const analyticsRoutes = require('./src/routes/analytics.routes');
 const app = express();
 
 const corsOptions = {
@@ -36,6 +37,7 @@ app.use('/admin', adminRoutes);
 app.use('/content', contentRoutes);
 app.use('/subscriptions', subscriptionRoutes);
 app.use('/browse', browseRoutes);
+app.use('/analytics', analyticsRoutes);
 app.use('/users', userRoutes);
 app.use('/uploads', uploadRoutes);
 app.use((req, res) => {

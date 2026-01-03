@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import VideoPlayer from '@/components/player/VideoPlayer';
-import { 
-  Loader2, ChevronLeft, ChevronRight, Play, Clock, Eye, Plus, 
-  Share2, ThumbsUp, MoreHorizontal, Sparkles, Lock, Crown, X
+import {
+    Loader2, ChevronLeft, ChevronRight, Play, Clock, Eye, Plus,
+    Share2, ThumbsUp, MoreHorizontal, Sparkles, Lock, Crown, X
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useRouter } from 'next/navigation';
@@ -16,14 +16,14 @@ interface Episode {
     title: string;
     synopsis: string;
     order: number;
-    video: string;      
-    thumbnail: string;  
-    duration?: number; 
-    isLocked?: boolean; 
+    video: string;
+    thumbnail: string;
+    duration?: number;
+    isLocked?: boolean;
 }
 
 interface SeriesPlayerProps {
-    episodeId: string; 
+    episodeId: string;
 }
 
 export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
@@ -31,13 +31,46 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
     const [episodes, setEpisodes] = useState<Episode[]>([]);
     const [seriesInfo, setSeriesInfo] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    
+
     // ✅ NEW: State for the Lock Modal
     const [showLockModal, setShowLockModal] = useState(false);
 
     // Player State
     const [activeIndex, setActiveIndex] = useState(0);
     const activeEpisode = episodes[activeIndex];
+
+    // Tracking State
+    const lastSavedTime = useRef<number>(0);
+
+    const handleProgressUpdate = async (currentTime: number) => {
+        // Only save every 10 seconds of playback
+        if (Math.abs(currentTime - lastSavedTime.current) > 10) {
+            lastSavedTime.current = currentTime;
+            await saveWatchHistory(currentTime, false);
+        }
+    };
+
+    const saveWatchHistory = async (progress: number, completed: boolean) => {
+        try {
+            await api.post('/users/history', {
+                episodeId: activeEpisode._id,
+                progressSeconds: Math.floor(progress),
+                completed
+            });
+        } catch (err) {
+            console.error("Failed to save watch history", err);
+        }
+    };
+
+    useEffect(() => {
+        if (activeEpisode) {
+            const seriesId = seriesInfo?._id || (typeof activeEpisode === 'object' ? (activeEpisode as any).series : null);
+            api.post('/analytics/view', {
+                episodeId: activeEpisode._id,
+                seriesId: seriesId
+            }).catch(err => console.error("Failed to track view", err));
+        }
+    }, [activeEpisode?._id, seriesInfo?._id]);
 
     useEffect(() => {
         const initPlayer = async () => {
@@ -47,13 +80,13 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                 // STEP 1: Fetch the specific episode to Play & get the series ID
                 const epRes = await api.get(`/content/episodes/${episodeId}`);
                 const currentEpData = epRes.data.data || epRes.data;
-                
+
                 // Extract Series ID (handles both populated object or string ID)
                 const fetchedSeriesId = currentEpData.series._id || currentEpData.series;
 
                 // STEP 2: Fetch the full series playlist
                 const listRes = await api.get(`/content/series/${fetchedSeriesId}`);
-                
+
                 const { series, episodes: epList } = listRes.data.data ?? listRes.data;
 
                 setSeriesInfo(series);
@@ -75,25 +108,28 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
         if (episodeId) initPlayer();
     }, [episodeId]);
 
-   const handleVideoEnded = () => {
-    if (activeIndex < episodes.length - 1) {
-        // Try to play next episode. changeEpisode handles the lock check.
-        changeEpisode(activeIndex + 1);
-    }
-   };
+    const handleVideoEnded = async () => {
+        // Save completion status
+        await saveWatchHistory(0, true);
 
-   const changeEpisode = (index: number) => {
-    if (index >= 0 && index < episodes.length) {
-        const targetEp = episodes[index];
-
-        // ✅ UPDATE: Show Modal instead of Redirecting
-        if (targetEp.isLocked) {
-            setShowLockModal(true);
-            return;
+        if (activeIndex < episodes.length - 1) {
+            // Try to play next episode. changeEpisode handles the lock check.
+            changeEpisode(activeIndex + 1);
         }
-        setActiveIndex(index);
-    }
-   };
+    };
+
+    const changeEpisode = (index: number) => {
+        if (index >= 0 && index < episodes.length) {
+            const targetEp = episodes[index];
+
+            // ✅ UPDATE: Show Modal instead of Redirecting
+            if (targetEp.isLocked) {
+                setShowLockModal(true);
+                return;
+            }
+            setActiveIndex(index);
+        }
+    };
 
     if (loading) {
         return (
@@ -112,23 +148,23 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
     if (!seriesInfo || episodes.length === 0) {
         return (
             <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white gap-6">
-               <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md text-center max-w-md">
-                   <h2 className="text-xl font-bold text-red-400 mb-2">Content Unavailable</h2>
-                   <p className="text-gray-400 mb-6">We couldn't load the requested series. It might have been removed or is currently inaccessible.</p>
-                   <button 
-                        onClick={() => router.back()} 
+                <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md text-center max-w-md">
+                    <h2 className="text-xl font-bold text-red-400 mb-2">Content Unavailable</h2>
+                    <p className="text-gray-400 mb-6">We couldn't load the requested series. It might have been removed or is currently inaccessible.</p>
+                    <button
+                        onClick={() => router.back()}
                         className="px-8 py-3 bg-white/10 hover:bg-white/20 rounded-full font-medium transition-all"
                     >
                         Go Back
-                   </button>
-               </div>
+                    </button>
+                </div>
             </div>
         );
     }
 
     return (
         <div className="flex flex-col lg:flex-row h-screen w-full bg-[#030014] text-gray-100 overflow-hidden font-sans selection:bg-primary/30">
-            
+
             {/* --- BACKGROUND EFFECTS --- */}
             <div className="fixed inset-0 pointer-events-none z-0">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[150px]" />
@@ -146,15 +182,15 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
 
             {/* --- MAIN LAYOUT --- */}
             <main className="flex-1 flex flex-col lg:flex-row relative z-10 overflow-hidden">
-                
+
                 {/* --- LEFT: PLAYER AREA --- */}
                 <div className="flex-1 flex items-center justify-center p-4 lg:p-8 relative group/player overflow-hidden">
-                    
+
                     {/* Glowing Container for Video */}
                     <div className="relative aspect-[9/16] h-full max-h-[85vh] w-auto shadow-2xl z-20">
                         {/* Animated Glow Behind Player */}
                         <div className="absolute -inset-1 bg-gradient-to-tr from-primary/30 to-blue-600/30 rounded-2xl blur opacity-50 group-hover/player:opacity-80 transition duration-1000" />
-                        
+
                         <div className="relative w-full h-full rounded-xl overflow-hidden bg-black ring-1 ring-white/10 shadow-inner">
                             {/* Active Player */}
                             <VideoPlayer
@@ -163,8 +199,9 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                                 poster={activeEpisode.thumbnail}
                                 isActive={true}
                                 onEnded={handleVideoEnded}
+                                onTimeUpdate={(time) => handleProgressUpdate(time)}
                             />
-                            
+
                             {/* Overlay Title (Desktop) */}
                             <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-start opacity-0 group-hover/player:opacity-100 transition-opacity duration-500 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
                                 <div className="transform translate-y-[-10px] group-hover/player:translate-y-0 transition-transform duration-500">
@@ -179,7 +216,7 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
 
                 {/* --- RIGHT: FUTURISTIC SIDEBAR --- */}
                 <aside className="w-full lg:w-[450px] xl:w-[500px] shrink-0 h-full flex flex-col bg-black/40 backdrop-blur-2xl border-l border-white/5 relative shadow-[-10px_0_30px_rgba(0,0,0,0.5)]">
-                    
+
                     {/* Header Section */}
                     <div className="p-6 lg:p-8 border-b border-white/5 bg-gradient-to-b from-white/5 to-transparent">
                         <div className="flex items-center gap-3 mb-4">
@@ -231,14 +268,14 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                             <MoreHorizontal size={16} /> Playlist
                         </h3>
                         <div className="flex gap-1">
-                            <button 
+                            <button
                                 onClick={() => changeEpisode(activeIndex - 1)}
                                 disabled={activeIndex === 0}
                                 className="p-1.5 rounded bg-white/5 hover:bg-primary hover:text-white disabled:opacity-30 disabled:hover:bg-white/5 transition-colors"
                             >
                                 <ChevronLeft size={16} />
                             </button>
-                            <button 
+                            <button
                                 onClick={() => changeEpisode(activeIndex + 1)}
                                 disabled={activeIndex === episodes.length - 1}
                                 className="p-1.5 rounded bg-white/5 hover:bg-primary hover:text-white disabled:opacity-30 disabled:hover:bg-white/5 transition-colors"
@@ -253,13 +290,13 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                         {episodes.map((ep, idx) => {
                             const isActive = activeIndex === idx;
                             return (
-                                <div 
+                                <div
                                     key={ep._id}
                                     onClick={() => changeEpisode(idx)}
                                     className={clsx(
                                         "group flex gap-4 p-2.5 rounded-xl transition-all duration-300 cursor-pointer border relative overflow-hidden",
-                                        isActive 
-                                            ? "bg-white/5 border-primary/50 shadow-[0_4px_20px_rgba(0,0,0,0.5)]" 
+                                        isActive
+                                            ? "bg-white/5 border-primary/50 shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
                                             : "bg-transparent border-transparent hover:bg-white/5 hover:border-white/5",
                                         ep.isLocked && "opacity-75"
                                     )}
@@ -269,8 +306,8 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
 
                                     {/* Thumbnail */}
                                     <div className="relative w-20 aspect-[9/16] rounded-lg bg-gray-900 overflow-hidden shrink-0 border border-white/5">
-                                        <img 
-                                            src={ep.thumbnail} 
+                                        <img
+                                            src={ep.thumbnail}
                                             alt={ep.title}
                                             className={clsx(
                                                 "w-full h-full object-cover transition-transform duration-700",
@@ -302,14 +339,14 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                                             {isActive && !ep.isLocked && <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_#8B5CF6]" />}
                                             {ep.isLocked && <div className="p-0.5 rounded bg-amber-500/10 border border-amber-500/20"><Lock size={10} className="text-amber-500" /></div>}
                                         </div>
-                                        
+
                                         <h4 className={clsx(
                                             "text-sm font-semibold line-clamp-2 leading-snug transition-colors",
                                             isActive ? "text-white" : "text-gray-300 group-hover:text-white"
                                         )}>
                                             {ep.title}
                                         </h4>
-                                        
+
                                         <div className="flex items-center gap-3 mt-1">
                                             <span className="text-[11px] text-gray-500 flex items-center gap-1">
                                                 <Clock size={10} /> 2m 45s
@@ -319,7 +356,7 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                                 </div>
                             );
                         })}
-                        
+
                         {/* Bottom Spacer */}
                         <div className="h-10" />
                     </div>
@@ -331,7 +368,7 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
                     <div className="bg-[#161b22] border border-white/10 p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl scale-100 animate-in zoom-in-95 duration-200 relative">
                         {/* Close Button */}
-                        <button 
+                        <button
                             onClick={() => setShowLockModal(false)}
                             className="absolute top-3 right-3 p-1 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition"
                         >
@@ -341,21 +378,21 @@ export default function SeriesPlayer({ episodeId }: SeriesPlayerProps) {
                         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-purple-600/10 flex items-center justify-center mx-auto mb-4 ring-1 ring-primary/20">
                             <Crown size={32} className="text-primary drop-shadow-[0_0_10px_rgba(139,92,246,0.5)]" />
                         </div>
-                        
+
                         <h3 className="text-xl font-bold text-white mb-2">Free Limit Reached</h3>
                         <p className="text-gray-400 text-sm mb-6 leading-relaxed">
                             You've watched all the free episodes. Subscribe now to unlock this series and enjoy unlimited streaming.
                         </p>
-                        
+
                         <div className="space-y-3">
-                            <button 
+                            <button
                                 onClick={() => router.push('/subscription')}
                                 className="w-full py-3 bg-gradient-to-r from-primary to-purple-600 hover:shadow-lg hover:shadow-primary/25 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2"
                             >
                                 <Crown size={18} fill="currentColor" />
                                 Subscribe to Unlock
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setShowLockModal(false)}
                                 className="w-full py-2.5 bg-transparent hover:bg-white/5 rounded-xl font-medium text-gray-500 hover:text-white transition-colors text-sm"
                             >

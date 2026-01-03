@@ -7,12 +7,13 @@ const SeriesSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
     coverImage: { type: String, default: '' },
-    
+
     // ✅ NEW FIELDS
-    type: { type: String, enum: ['movie', 'series'], default: 'series' }, 
+    type: { type: String, enum: ['movie', 'series'], default: 'series' },
     videoUrl: { type: String }, // Stores the main video if it's a movie
     category: { type: String }, // Stores the category name directly for simplicity
-    
+    views: { type: Number, default: 0 },
+
     creator: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     status: { type: String, enum: seriesStatuses, default: 'pending' },
     tags: [{ type: String, trim: true }]

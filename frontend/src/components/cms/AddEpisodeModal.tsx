@@ -14,12 +14,12 @@ interface Props {
 }
 
 export default function AddEpisodeModal({ seriesId, onClose, onSuccess, nextOrder }: Props) {
-  const [formData, setFormData] = useState({ 
-    title: '', 
-    synopsis: '', 
-    order: nextOrder.toString() 
+  const [formData, setFormData] = useState({
+    title: '',
+    synopsis: '',
+    order: nextOrder.toString()
   });
-  
+
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [video, setVideo] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,10 +34,12 @@ export default function AddEpisodeModal({ seriesId, onClose, onSuccess, nextOrde
 
     try {
       // 1. Upload Assets
-      const videoUrl = await uploadToCloudinary(video, 'video');
+      const videoRes = await uploadToCloudinary(video, 'video');
+      const videoUrl = videoRes.url;
       let thumbnailUrl = '';
       if (thumbnail) {
-        thumbnailUrl = await uploadToCloudinary(thumbnail, 'image');
+        const thumbRes = await uploadToCloudinary(thumbnail, 'image');
+        thumbnailUrl = thumbRes.url;
       }
 
       // 2. Save to Backend
@@ -62,7 +64,7 @@ export default function AddEpisodeModal({ seriesId, onClose, onSuccess, nextOrde
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
       <div className="bg-[#1c2128] border border-white/10 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-        
+
         <div className="flex justify-between items-center p-6 border-b border-white/5">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Film className="text-primary" /> Add Episode {formData.order}
@@ -74,32 +76,32 @@ export default function AddEpisodeModal({ seriesId, onClose, onSuccess, nextOrde
 
         <div className="p-6 overflow-y-auto custom-scrollbar">
           <form onSubmit={handleSubmit} className="space-y-6">
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">Ep Number</label>
-                <input 
+                <input
                   type="number" required
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
-                  value={formData.order} onChange={e => setFormData({...formData, order: e.target.value})}
+                  value={formData.order} onChange={e => setFormData({ ...formData, order: e.target.value })}
                 />
               </div>
               <div className="md:col-span-2 space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">Episode Title</label>
-                <input 
+                <input
                   type="text" required placeholder="e.g. The Beginning"
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
-                  value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})}
+                  value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-400 uppercase">Synopsis</label>
-              <textarea 
+              <textarea
                 rows={2} placeholder="What happens in this episode?"
                 className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
-                value={formData.synopsis} onChange={e => setFormData({...formData, synopsis: e.target.value})}
+                value={formData.synopsis} onChange={e => setFormData({ ...formData, synopsis: e.target.value })}
               />
             </div>
 

@@ -13,16 +13,16 @@ interface Props {
 }
 
 export default function EditSeriesModal({ series, onClose, onSuccess }: Props) {
-  const [categories, setCategories] = useState<{_id: string, name: string}[]>([]);
+  const [categories, setCategories] = useState<{ _id: string, name: string }[]>([]);
   const [loading, setLoading] = useState(false);
-  
+
   // Form State
-  const [formData, setFormData] = useState({ 
-    title: series.title || '', 
-    description: series.description || '', 
-    category: series.category || '' 
+  const [formData, setFormData] = useState({
+    title: series.title || '',
+    description: series.description || '',
+    category: series.category || ''
   });
-  
+
   // Image State
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState(series.coverImage || '');
@@ -41,7 +41,8 @@ export default function EditSeriesModal({ series, onClose, onSuccess }: Props) {
 
       // 1. Upload new image ONLY if user selected one
       if (thumbnail) {
-        coverImageUrl = await uploadToCloudinary(thumbnail, 'image');
+        const thumbRes = await uploadToCloudinary(thumbnail, 'image');
+        coverImageUrl = thumbRes.url;
       }
 
       // 2. Update Backend
@@ -63,7 +64,7 @@ export default function EditSeriesModal({ series, onClose, onSuccess }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
       <div className="bg-[#161b22] border border-white/10 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-        
+
         <div className="flex justify-between items-center p-6 border-b border-white/5 bg-[#0f1117]">
           <h2 className="text-xl font-bold text-white">Edit Series</h2>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white">
@@ -72,24 +73,24 @@ export default function EditSeriesModal({ series, onClose, onSuccess }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Left: Inputs */}
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">Title</label>
-                <input 
+                <input
                   type="text" required
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
-                  value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})}
+                  value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">Category</label>
-                <select 
+                <select
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none appearance-none"
-                  value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}
+                  value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}
                 >
                   {categories.map(c => <option key={c._id} value={c.name} className="bg-gray-900">{c.name}</option>)}
                 </select>
@@ -97,10 +98,10 @@ export default function EditSeriesModal({ series, onClose, onSuccess }: Props) {
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">Description</label>
-                <textarea 
+                <textarea
                   rows={4}
                   className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary outline-none"
-                  value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}
+                  value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
             </div>
@@ -113,11 +114,11 @@ export default function EditSeriesModal({ series, onClose, onSuccess }: Props) {
                 thumbnail ? "border-primary/50" : "border-white/10 hover:border-white/30"
               )}>
                 {/* Preview Logic */}
-                <img 
-                  src={thumbnail ? URL.createObjectURL(thumbnail) : previewUrl} 
-                  className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity" 
+                <img
+                  src={thumbnail ? URL.createObjectURL(thumbnail) : previewUrl}
+                  className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity"
                 />
-                
+
                 <div className="relative z-10 flex flex-col items-center drop-shadow-md">
                   {thumbnail ? (
                     <>
@@ -138,7 +139,7 @@ export default function EditSeriesModal({ series, onClose, onSuccess }: Props) {
 
           <div className="pt-4 border-t border-white/5 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl text-sm font-bold text-gray-400 hover:bg-white/5">Cancel</button>
-            <button 
+            <button
               type="submit" disabled={loading}
               className="px-8 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg disabled:opacity-50"
             >
